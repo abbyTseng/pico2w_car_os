@@ -1,22 +1,22 @@
 services:
-  builder:
-    # 使用當前目錄下的 Dockerfile 建置映像檔
+  # 1. 將服務名稱改為更具識別性的名字
+  pico2w_builder:
     build: .
-    image: pico2_builder:latest
+    # 2. 修改映像檔標籤，標註這是針對 pico2w 的編譯環境
+    image: pico2w_builder:latest
     
-    # 關鍵：將 Mac 的當前目錄 (.) 掛載到容器內的 /workspace
-    # 這樣容器編譯完的檔案，會直接出現在你的 Mac 上
+    # 掛載目錄保持不變，這樣你在 Mac 修改程式碼，容器會同步看到
     volumes:
       - .:/workspace
     
-    # 設定環境變數，確保 SDK 知道我們要編譯無線版
     environment:
       - PICO_BOARD=pico2_w
+      # 額外建議：強制指定平台為 rp2350，這能確保編譯器選對架構
+      - PICO_PLATFORM=rp2350
       
-    # 這是我們的「一鍵編譯指令」
-    # 注意：我們使用 'build_docker' 資料夾，與 Mac 本機的 'build' 分開，避免路徑衝突
+    # 3. 在一鍵編譯指令中，我們也可以調整輸出資料夾名稱
     command: >
       /bin/bash -c "
-      cmake -B build_docker -DPICO_BOARD=pico2_w -DCMAKE_BUILD_TYPE=Debug . &&
-      cmake --build build_docker -j4
+      cmake -B build_rp2350 -DPICO_BOARD=pico2_w -DCMAKE_BUILD_TYPE=Debug . &&
+      cmake --build build_rp2350 -j$(nproc)
       "

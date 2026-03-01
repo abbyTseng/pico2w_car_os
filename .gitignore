@@ -21,3 +21,5 @@ build_test/
 src/ON/
 
 build_test_docker/
+
+external/
