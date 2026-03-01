@@ -6,7 +6,7 @@
 * **Language:** C (Standard C99/C11)
 * **Build System:** CMake + Docker (Standardized Build Env)
 * **Testing:** Unity Framework (Unit Test) + Saleae/Oscilloscope (Physical Test)
-* **Current Phase:** Phase 3 - RTOS Kernel & SMP (Starting Day 11)
+* **Current Phase:** Phase 3 - RTOS Task Design & RMS (Starting Day 12)
 
 ## 2. Architecture & Design Patterns (Layered Architecture)
 We have refactored the system into a strict 3-layer architecture to ensure decoupling and testability.
@@ -17,8 +17,8 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
     * Initializes System HAL (`hal_init_system`).
     * Initializes Drivers (`hal_led`, `hal_i2c`, `hal_storage`).
     * Injects dependencies into App Layer.
-    * Runs the Super Loop.
-* **Constraint:** **NO** direct hardware manipulation logic allowed here.
+    * Starts FreeRTOS Scheduler (`vTaskStartScheduler`).
+* **Constraint:** **NO** direct hardware manipulation logic allowed here. Super loop replaced by RTOS Tasks.
 
 ### B. App Layer (`src/app/`)
 * **Role:** Business Logic (e.g., `app_display`, `app_storage`).
@@ -33,22 +33,23 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
     * **`hal_i2c`:** Implements "9-Clock Recovery" and physical timing timeouts.
     * **`hal_led`:** Abstracts Pico 2W's CYW43 wireless LED control behind a generic interface.
     * **`hal_gpio`:** Handles interrupts and callback registration.
-    * **`hal_storage`:** (New) Abstraction for LittleFS on Flash with XIP protection.
+    * **`hal_storage`:** Abstraction for LittleFS on Flash with XIP protection.
 
 ---
 
-## 3. CI/CD Architecture (Dual-Track)
+## 3. CI/CD Architecture (Dual-Track & Shift-Left Strategy)
+
+*Note: Currently in OS Bring-up transition. CI/CD pipelines are expected to fail until FreeRTOS mocking is implemented.*
 
 ### A. Local Guardrail (The "Hook")
-* **Trigger:** `git commit`
-* **Tool:** `pre-commit` framework.
-* **Actions:**
-    1.  **Static Analysis:** `cppcheck` (configured to suppress missing system headers).
-    2.  **Unit Tests:** `scripts/run_tests.sh` (Runs CMake/CTest inside Docker).
+* **Trigger:** `git commit` via `.git/hooks/pre-commit` (Implementation delayed to Phase 4).
+* **Strategy:** "Shift-Left Testing" to catch compilation and unit test errors before pushing.
+* **Current Status:** Temporarily disabled to allow committing OS integration code without triggering false-positive test failures due to missing FreeRTOS definitions in the x86 test environment.
 
 ### B. Cloud Factory (GitHub Actions)
-* **Trigger:** `git push`
-* **Actions:** Lint, Test, Build (`.uf2`), and Artifact Upload.
+* **Trigger:** `git push` (`.github/workflows/main.yml`)
+* **Actions:** Lint (Cppcheck), Test (CTest), Build (`.uf2`).
+* **Current Status:** Red (Failed) ❌. This is an accepted technical debt while we migrate the test suite to recognize FreeRTOS headers and mock the RTOS scheduler.
 
 ---
 
@@ -61,123 +62,66 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
     * **CMake:** Add mock source files to `add_executable`.
 
 * **Level 2: Testing HAL Logic (The "Mock SDK" Approach)**
-    * **Goal:** Verify HAL interacts correctly with Pico SDK functions (e.g., `gpio_init`).
+    * **Goal:** Verify HAL interacts correctly with Pico SDK functions.
     * **Method:** Use `test/mock/` headers to simulate SDK behavior in Docker (x86).
-    * **Files:** `test/mock/pico/stdlib.h`, `test/mock/hardware/gpio.h`.
 
 ### B. White-box Testing (Crucial for Internal Logic)
 To test `static` functions (ISRs, internal state machines) or `static` variables:
 1.  **Technique:** Directly `#include "../src/hal/hal_xxx.c"` inside the test file.
 2.  **Rule:** **DO NOT** add the source file to `add_executable` in CMake to avoid multiple definitions.
-3.  **MISRA C Compromise:** To mock standard SDK types like `uint`, we use `typedef unsigned int uint;` in our Mock headers (`mock/pico/stdlib.h`) to satisfy the compiler on non-embedded platforms.
 
 ---
 
 ## 5. Key Directory Structure
-chinghuitseng@Mac pico2_automotive_firmware % tree -I "build*|.git|.vscode"
 .
-├── 30天計畫.md
-├── CMakeLists.txt
-├── CMakePresets.json
+├── .github
+│   └── workflows
+│       └── main.yml       # Cloud CI/CD Pipeline
 ├── CONTEXT.md
 ├── Dockerfile
 ├── docker-compose.yml
-├── pico_sdk_import.cmake
-├── scripts
-│   └── run_tests.sh
 ├── external
-│   └── littlefs           # [Added Day 10]
+│   ├── FreeRTOS-Kernel    # [Added Day 11] v11.1.0 SMP Kernel
+│   └── littlefs           
 ├── src
-│   ├── CMakeLists.txt
+│   ├── CMakeLists.txt     # [Modified Day 11] Custom RTOS target to break circular dependencies
+│   ├── FreeRTOSConfig.h   # [Added Day 11] Nuclear macro definitions for SMP & Timers
 │   ├── app
-│   │   ├── CMakeLists.txt
-│   │   ├── app_blink.c
-│   │   ├── app_blink.h
-│   │   ├── app_display.c
-│   │   ├── app_display.h
-│   │   ├── app_storage.c  # [Added Day 10]
-│   │   └── app_storage.h  # [Added Day 10]
 │   ├── common
-│   │   ├── CMakeLists.txt
-│   │   ├── common_ringbuffer.c
-│   │   ├── common_ringbuffer.h
-│   │   ├── common_status.h
-│   │   └── common_types.h
 │   ├── hal
-│   │   ├── CMakeLists.txt
-│   │   ├── hal_delay.c
-│   │   ├── hal_delay.h
-│   │   ├── hal_dma.c
-│   │   ├── hal_dma.h
-│   │   ├── hal_gpio.c
-│   │   ├── hal_gpio.h
-│   │   ├── hal_i2c.c
-│   │   ├── hal_i2c.h
-│   │   ├── hal_init.c
-│   │   ├── hal_init.h
-│   │   ├── hal_led.c
-│   │   ├── hal_led.h
-│   │   ├── hal_multicore.c
-│   │   ├── hal_multicore.h
-│   │   ├── hal_storage.c  # [Added Day 10]
-│   │   └── hal_storage.h  # [Added Day 10]
-│   └── main.c
+│   └── main.c             # [Modified Day 11] RTOS Task definitions
 └── test
-    ├── CMakeLists.txt
-    ├── mock
-    │   ├── hardware
-    │   │   ├── gpio.h
-    │   │   └── i2c.h
-    │   └── pico
-    │       └── stdlib.h
-    ├── mock_hal_delay.c
-    ├── mock_hal_gpio.c
-    ├── mock_hal_led.c
-    ├── mock_hal_multicore.c
-    ├── test_app_display.c
-    ├── test_blink.c
-    ├── test_gpio_callback.c
-    ├── test_hal_i2c.c
-    └── test_ringbuffer.c
+    └── CMakeLists.txt
 
 ## 6. Development Workflow Rules
 * **New Feature:** Create Source (`src/`) -> Create Test (`test/`) -> Update `test/CMakeLists.txt`.
-* **Mocking Rule:**
-    * Testing App? Link `mock_hal_xxx.c`.
-    * Testing HAL? Include `test/mock` headers.
-* **Static Testing Rule:**
-    * Testing static functions? Use `#include "source.c"`.
+* **Mocking Rule:** Testing App? Link `mock_hal_xxx.c`. Testing HAL? Include `test/mock` headers.
+* **Commit Rule:** Never commit the `build_rp2350` folder or entire embedded open-source repositories (use `.gitignore`).
 
 ---
 
-## 7. Next Steps (Phase 3: RTOS & SMP)
-**Goal:** Introduce FreeRTOS Kernel and Symmetric Multi-Processing (SMP) to handle concurrency.
+## 7. Next Steps (Phase 3: Task Design & RMS)
+**Goal:** Wrap application logic into standard RTOS tasks and assign scientifically proven priorities.
 
-**Tasks (Day 11):**
-1.  **Integrate FreeRTOS:** Add FreeRTOS-SMP kernel to the project.
-2.  **Core Activation:** Enable Core 1.
-3.  **Task Separation:**
-    * **Core 0 Task:** Critical Logic & Storage (LittleFS).
-    * **Core 1 Task:** UI Refresh (OLED/LED) to prevent blocking.
-4.  **Thread Safety:** Implement Spinlocks/Mutexes for shared resources (`hal_i2c`, `hal_gpio`).
+**✅ Tasks Completed (Day 11 - OS Bring-up):**
+* ✅ Integrated FreeRTOS v11.1.0 and broken Pico SDK 2.0 circular dependency.
+* ✅ Enabled SMP (`configNUM_CORES=2`) and configured hardware porting layers.
+* ✅ Verified Dynamic Load Balancing (Core 0/1 context switching) with `vTaskDelay`.
+* ✅ Successfully initialized CYW43 Wi-Fi driver under the RTOS scheduler.
+
+**Tasks (Day 12):**
+1.  **Task Encapsulation:** Move OLED UI (`app_display`) and Boot Count (`app_storage`) logic into dedicated `vTask...` functions.
+2.  **Rate Monotonic Scheduling (RMS):** Assign task priorities based on mathematical frequency (shorter period = higher priority).
+3.  **Resource Protection:** Introduce Mutexes to protect shared hardware buses (I2C) from concurrent core access.
 
 ---
 
 ## 8. 🛠 Current Technical Debt (技術債與重構追蹤)
 
-### Resolved (Phase 2 Finished)
-* ✅ **[Fixed] Flash Collision:** Implemented `save_and_disable_interrupts()` in `hal_storage.c` to prevent XIP crashes during write operations.
-* ✅ **[Fixed] I2C Timing:** Increased timeout to 50ms to account for physical transmission time of 129 bytes at 100kHz.
-* ✅ **[Fixed] OLED Artifacts:** Corrected SSD1306 initialization (Multiplex Ratio & Page Addressing Mode 0x02) for 128x32 display.
-* ✅ **[Fixed] Enum Conversion:** Enforced explicit casting between `hal_i2c_status_t` and `common_status_t`.
+### Resolved (Day 11 Focus)
+* ✅ **[Fixed] CMake Circular Dependency:** The official `pico_freertos` target causes a deadlock. Resolved by manually defining the `FreeRTOS-Kernel` target, extracting `tasks.c`/`port.c`, and forcefully injecting `target_include_directories`.
+* ✅ **[Fixed] SMP Implicit Declaration:** `port.c` failed to compile due to missing `xTimerPendFunctionCallFromISR`. Resolved by enabling `configUSE_TIMERS 1` and `INCLUDE_xTimerPendFunctionCall 1` for cross-core FIFO messaging.
 
-### Pending (Phase 3 Focus)
-* ⚠️ **[High] Thread Safety:** `hal_i2c` and `hal_gpio` are currently **NOT** thread-safe. Concurrent access from Core 0 and Core 1 will cause race conditions. (Target: Day 11)
-* ⚠️ **[Low] MISRA Compliance:** `common_ringbuffer.c` still contains some pointer arithmetic that needs review against MISRA C:2012 Rule 18.4.
-
----
-
-## 9. Key Metrics (Portfolio Proof - Day 10)
-* **Reliability:** System verified to survive power-loss events during filesystem writes (LittleFS Copy-on-Write).
-* **Persistence:** Boot Count tracking verified in logs (Count increments across reboots: 17 -> 18).
-* **Display Stability:** Artifact-free rendering on SSD1306 (128x32) confirmed via visual verification.
+### Pending (Phase 3 & 4 Focus)
+* ⚠️ **[High] CI/CD & Unit Test Breakage:** Including `"FreeRTOS.h"` in source files breaks the x86 Docker unit tests. We must implement RTOS API mocking before re-enabling local Git Hooks and resolving the GitHub Actions failure.
+* ⚠️ **[High] Thread Safety (I2C/
