@@ -36,5 +36,8 @@ target_link_libraries(hal PUBLIC
     hardware_flash 
     hardware_sync
     common
+    FreeRTOS-Kernel
+    freertos_config
+    pico_stdio_usb
 )
 

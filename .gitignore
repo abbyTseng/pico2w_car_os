@@ -21,5 +21,6 @@ build_test/
 src/ON/
 
 build_test_docker/
+build_rp2350/
 
 external/

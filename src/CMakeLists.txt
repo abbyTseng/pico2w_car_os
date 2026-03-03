@@ -1,7 +1,7 @@
-# 引入子模組
-add_subdirectory(common)
-add_subdirectory(hal)
-add_subdirectory(app)
+# ==========================================
+# 先不要 include subdirectories! 
+# 先定義 OS 層與 Config
+# ==========================================
 
 # 1. 建立 Config 虛擬目標
 add_library(freertos_config INTERFACE)
@@ -38,18 +38,25 @@ target_link_libraries(FreeRTOS-Kernel PUBLIC
     pico_multicore 
     hardware_exception 
 )
-# -----------------------------------------------------------------------------
 
+# ==========================================
+# OS 定義完成後，才引入我們的子模組 (HAL, App)
+# 這樣它們才看得見 FreeRTOS-Kernel
+# ==========================================
+add_subdirectory(common)
+add_subdirectory(hal)
+add_subdirectory(app)
+
+# ==========================================
 # 主程式
+# ==========================================
 add_executable(${PROJECT_NAME}_main main.c)
 
 pico_enable_stdio_usb(${PROJECT_NAME}_main 1)
 pico_enable_stdio_uart(${PROJECT_NAME}_main 0)
 
-# 主程式也需要知道我們是 SMP
 target_compile_definitions(${PROJECT_NAME}_main PRIVATE configNUM_CORES=2)
 
-# 連結所有模組
 target_link_libraries(${PROJECT_NAME}_main
     freertos_config
     FreeRTOS-Kernel         
@@ -58,5 +65,4 @@ target_link_libraries(${PROJECT_NAME}_main
     app
 )
 
-# 產出 UF2 燒錄檔
 pico_add_extra_outputs(${PROJECT_NAME}_main)

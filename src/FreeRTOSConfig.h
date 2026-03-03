@@ -13,6 +13,7 @@
 /* -------------------------------------------------------------------------- */
 #define configUSE_PREEMPTION 1
 #define configUSE_TIME_SLICING 1
+#define configUSE_MUTEXES 1
 #define configCPU_CLOCK_HZ 150000000           // RP2350 預設時脈
 #define configTICK_RATE_HZ ((TickType_t)1000)  // 1ms Tick
 #define configMAX_PRIORITIES 5

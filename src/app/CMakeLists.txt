@@ -1,4 +1,4 @@
-# App: Business logic. Hardware agnostic. No direct SDK calls.
+# App: Business logic. Hardware agnostic.
 
 add_library(app STATIC
     app_blink.c
@@ -10,8 +10,10 @@ target_include_directories(app PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# App depends on HAL (and common) only; never on pico_stdlib or hardware_*
+# 加入 FreeRTOS-Kernel 與 freertos_config 的依賴
 target_link_libraries(app PUBLIC
     hal
     common
+    FreeRTOS-Kernel
+    freertos_config
 )

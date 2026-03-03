@@ -3,9 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "FreeRTOS.h"
 #include "common/common_status.h"
 #include "hal/hal_i2c.h"
 #include "pico/stdlib.h"
+#include "task.h"
 
 #define OLED_ADDR 0x3C
 
@@ -116,3 +118,30 @@ bool app_display_init(void)
 }
 
 void app_display_test_once(void) { app_display_show_day10(); }
+
+void vAppDisplayTask(void *pvParameters)
+{
+    (void)pvParameters;
+
+    printf("[App Display] Initializing OLED...\n");
+    // 這裡的 init 底層會呼叫 hal_i2c_init，進而建立 Mutex
+    if (!app_display_init())
+    {
+        printf("[App Display] OLED Init Failed. Suspending Task.\n");
+        vTaskSuspend(NULL);  // 初始化失敗就掛起自己，不要空轉浪費 CPU
+    }
+
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(100);  // 100ms 週期 (10Hz 高頻刷新)
+
+    while (1)
+    {
+        // 這裡會呼叫 hal_i2c_write，底層會自動 Take/Give Mutex！
+        app_display_show_day10();
+
+        // 註解掉 printf 避免洗畫面，但實作上它確實在跑
+        // printf("[Task Display] Refreshed on Core: %d\n", portGET_CORE_ID());
+
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    }
+}
