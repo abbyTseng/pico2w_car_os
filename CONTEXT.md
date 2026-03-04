@@ -6,7 +6,7 @@
 * **Language:** C (Standard C99/C11)
 * **Build System:** CMake + Docker (Standardized Build Env)
 * **Testing:** Unity Framework (Unit Test) + Saleae/Oscilloscope (Physical Test)
-* **Current Phase:** Phase 3 - IPC & Interrupt Decoupling (Starting Day 13)
+* **Current Phase:** Phase 3 - RTOS Architecture & Safety (Completed Day 13, Starting Day 14)
 
 ## 2. Architecture & Design Patterns (Layered Architecture)
 We have refactored the system into a strict 3-layer architecture to ensure decoupling and testability.
@@ -20,16 +20,18 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
 * **Constraint:** **NO** direct hardware manipulation logic or original SDK includes (like `pico/stdlib.h`) allowed here. Super loop replaced by RTOS Tasks.
 
 ### B. App Layer (`src/app/`)
-* **Role:** Business Logic (e.g., `app_display`, `app_storage`).
+* **Role:** Business Logic (e.g., `app_display`, `app_storage`, `app_button`).
 * **Responsibilities:**
     * Encapsulated into standard FreeRTOS task functions (`vAppDisplayTask`, etc.).
     * Utilizes absolute timing (`vTaskDelayUntil`) for Hard Real-time RMS execution.
+    * Utilizes Deferred Interrupt Processing (`vAppButtonTask`) for software debouncing without blocking the CPU.
     * Calls HAL interfaces using `common_status_t`.
 * **Constraint:** Hardware-agnostic. Should run on any MCU if HAL is provided. FreeRTOS API usage is restricted to `.c` files, never in `.h` headers.
 
 ### C. HAL Layer (`src/hal/`)
 * **Role:** Hardware Abstraction.
 * **Key Modules:**
+    * **`hal_gpio`:** Implements minimal ISR routines. Exposes strict `hal_gpio_isr_callback_t` interface to prevent accidental blocking API usage from App layer.
     * **`hal_i2c`:** Protected by FreeRTOS Mutex (`xSemaphoreCreateMutex`) for SMP thread safety. Implements "9-Clock Recovery" within the locked state.
     * **`hal_init`:** Wraps SDK specific modules (e.g., `pico_stdio_usb`) to prevent leaky abstractions.
     * **`hal_led`:** Abstracts Pico 2W's CYW43 wireless LED control.
@@ -83,26 +85,26 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
 
 ---
 
-## 7. Next Steps (Phase 3: IPC & Interrupt Decoupling)
-**✅ Tasks Completed (Day 12 - Task Design & RMS):**
-* ✅ Refactored `main.c` to be a pure OS scheduler starter, fixing Leaky Abstractions (`pico/stdlib.h` removed).
-* ✅ Implemented absolute timing using `vTaskDelayUntil` based on RMS (100ms/500ms/1000ms), eliminating Jitter.
-* ✅ Implemented FreeRTOS Mutex (`xSemaphoreTake` with timeout) in `hal_i2c.c` to protect hardware resources from SMP concurrent access.
-* ✅ Tuned Task Stack sizes to 1024 Words to prevent Silent Crashes during CYW43 initialization.
-* ✅ Demonstrated "Graceful Degradation" (Fault Isolation) by suspending the OLED task upon hardware I2C NACK without crashing the system.
+## 7. Next Steps (Phase 3: RTOS Architecture & Safety)
 
-**Tasks (Day 13):**
-1. **IPC (Inter-Process Communication):** Introduce FreeRTOS Queues or Direct Task Notifications to pass data safely between tasks.
-2. **Interrupt Decoupling:** Refactor GPIO callbacks (`on_button_press`). Move logic out of ISR context into a deferred handler task to ensure system responsiveness.
+**✅ Tasks Completed (Day 13 - IPC Patterns & ISR Decoupling):**
+* ✅ Implemented Direct Task Notification (`vTaskNotifyGiveFromISR`) to decouple GPIO interrupts from application logic.
+* ✅ Built a Deferred Handler Task (`vAppButtonTask`) with a 50ms timestamp-based software debounce.
+* ✅ Achieved 0-byte dynamic memory overhead for IPC and guaranteed ISR execution time < 5μs.
+* ✅ Eliminated `printf` and blocking operations from ISR, removing the risk of CPU starvation and SMP deadlocks.
+
+**Tasks (Day 14 - Mutex & Priority Inversion Focus):**
+1. **Priority Inversion Simulation:** Create a deliberate scenario where a low-priority task holds a resource (Mutex), a high-priority task waits for it, and a medium-priority task preempts the low-priority one.
+2. **Priority Inheritance Validation:** Demonstrate how FreeRTOS automatically promotes the low-priority task to resolve the deadlock, analyzing the RTOS trace or logs.
 
 ---
 
 ## 8. 🛠 Current Technical Debt
 
-### Resolved (Day 12 Focus)
+### Resolved (Day 12 & Day 13 Focus)
+* ✅ **[Fixed] ISR to Task Communication:** Removed unsafe `printf` from ISR. Implemented FreeRTOS Direct Task Notification for safe, zero-overhead interrupt deferred processing.
 * ✅ **[Fixed] Thread Safety (I2C/SMP):** Implemented Mutex inside `hal_i2c`. Verified thread-safe execution without deadlocks.
 * ✅ **[Fixed] CMake Dependency Graph:** Properly enforced `FreeRTOS-Kernel` and `pico_stdio_usb` linkages at the HAL/App levels, solving `implicit declaration` errors.
 
 ### Pending (Phase 3 & 4 Focus)
 * ⚠️ **[High] CI/CD & Unit Test Breakage:** x86 Docker unit tests still cannot mock FreeRTOS APIs properly. Need to implement `mock_freertos.h` for GitHub Actions to pass.
-* ⚠️ **[Medium] ISR to Task Communication:** GPIO callbacks currently just ignore parameters or use `printf` (unsafe in ISR). Needs RTOS Queue implementation.

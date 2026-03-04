@@ -2,6 +2,7 @@
 
 #include "FreeRTOS.h"
 #include "app/app_blink.h"
+#include "app/app_button.h"
 #include "app/app_display.h"
 #include "app/app_storage.h"
 #include "hal/hal_delay.h"
@@ -32,7 +33,7 @@ int main(void)
     xTaskCreate(vAppDisplayTask, "OLED_Task", 1024, NULL, 3, NULL);
     xTaskCreate(vAppBlinkTask, "LED_Task", 1024, NULL, 2, NULL);
     xTaskCreate(vMonitorTask, "MON_Task", 1024, NULL, 1, NULL);
-
+    xTaskCreate(vAppButtonTask, "BTN_Task", 1024, NULL, 4, NULL);
     vTaskStartScheduler();
 
     while (1);

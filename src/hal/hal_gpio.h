@@ -7,6 +7,6 @@
 void hal_gpio_init_input(uint32_t pin);
 
 // 註冊 Callback (觀察者)
-void hal_gpio_set_callback(hal_gpio_callback_t cb);
+void hal_gpio_set_isr_callback(hal_gpio_isr_callback_t cb);
 
 #endif

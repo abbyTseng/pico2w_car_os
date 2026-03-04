@@ -2,35 +2,25 @@
 
 #include <stdio.h>
 
-#include "hal/hal_gpio.h"
 #include "hal/hal_led.h"
 
 // 引入 FreeRTOS
 #include "FreeRTOS.h"
 #include "task.h"
 
-// Callback 函式
-static void on_button_press(uint32_t pin, uint32_t event)
-{
-    // 嚴格標準：明確告訴編譯器這兩個參數目前不用，消除 unused-parameter 警告
-    (void)pin;
-    (void)event;
-}
-
 // --- LED 閃爍 Task ---
 void vAppBlinkTask(void *pvParameters)
 {
     (void)pvParameters;  // 忽略未使用參數
 
-    printf("[App Blink] Initializing LED & GPIO...\n");
+    printf("[App Blink] Initializing LED...\n");
     const LedDevice *led = hal_led_get_default();
     if (led && led->init)
     {
         led->init();
     }
 
-    hal_gpio_init_input(22);
-    hal_gpio_set_callback(on_button_press);
+    // (已移除原先舊的 GPIO 22 按鈕邏輯，因為交由 app_button 處理了)
 
     // 絕對週期設定
     TickType_t xLastWakeTime = xTaskGetTickCount();

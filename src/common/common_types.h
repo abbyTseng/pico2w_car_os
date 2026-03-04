@@ -19,5 +19,5 @@ typedef uint32_t common_uint32;
  * @param pin 觸發的腳位編號
  * @param event 觸發事件 (例如 Falling Edge)
  */
-typedef void (*hal_gpio_callback_t)(uint32_t pin, uint32_t event);
+typedef void (*hal_gpio_isr_callback_t)(uint32_t pin, uint32_t events);
 #endif /* COMMON_TYPES_H */
