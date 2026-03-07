@@ -21,4 +21,6 @@ void hal_i2c_init(uint32_t baudrate);
 hal_i2c_status_t hal_i2c_write_timeout(uint8_t addr, const uint8_t *src, size_t len,
                                        uint32_t timeout_us);
 
+// 實驗專用：在持有鎖的狀態下強制佔用 CPU
+void hal_i2c_lab_simulate_long_transfer(uint32_t work_ms);
 #endif  // HAL_I2C_H

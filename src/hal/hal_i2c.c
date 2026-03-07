@@ -6,6 +6,15 @@
 // 引入 FreeRTOS API (僅限 .c 檔，不污染 HAL 介面)
 #include "FreeRTOS.h"
 #include "semphr.h"
+#include "task.h"  // 為了 xTaskGetTickCount
+
+// ==========================================
+// 🧪 LAB 控制開關：
+// 0 = 使用 Binary Semaphore (引發優先權反轉災難)
+// 1 = 使用 FreeRTOS Mutex (啟動優先權繼承救援)
+#define LAB_USE_MUTEX 1
+#define I2C_PRIORITY_LAB 1  // 開啟 Lab 模式
+// ==========================================
 
 #define I2C_INST i2c0
 #define I2C_SDA_PIN 4
@@ -51,8 +60,13 @@ void hal_i2c_init(uint32_t baudrate)
     // 【新增】初始化 Mutex (只建立一次)
     if (i2c_mutex == NULL)
     {
+#if LAB_USE_MUTEX
         i2c_mutex = xSemaphoreCreateMutex();
-        // 嚴格防護：如果 RTOS Heap 滿了導致創建失敗，直接停機
+#else
+        i2c_mutex = xSemaphoreCreateBinary();
+        // Binary Semaphore 建立後預設是空的，必須先 Give 才能被 Take
+        xSemaphoreGive(i2c_mutex);
+#endif
         configASSERT(i2c_mutex != NULL);
     }
 
@@ -63,6 +77,33 @@ void hal_i2c_init(uint32_t baudrate)
     gpio_pull_up(I2C_SCL_PIN);
 }
 
+#ifdef I2C_PRIORITY_LAB
+void hal_i2c_lab_simulate_long_transfer(uint32_t work_ms)
+{
+    if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE)
+    {
+        uint32_t elapsed_active_ms = 0;
+        TickType_t last_tick = xTaskGetTickCount();
+
+        // 只計算真正持有 CPU 的時間！
+        while (elapsed_active_ms < work_ms)
+        {
+            TickType_t now = xTaskGetTickCount();
+            if (now != last_tick)
+            {
+                // 若差距大於 2，代表中間被高優先權任務搶佔了，不能計入工作進度
+                if ((now - last_tick) <= 2)
+                {
+                    elapsed_active_ms += (now - last_tick);
+                }
+                last_tick = now;
+            }
+        }
+        xSemaphoreGive(i2c_mutex);
+    }
+}
+#endif
+
 hal_i2c_status_t hal_i2c_write_timeout(uint8_t addr, const uint8_t *src, size_t len,
                                        uint32_t timeout_us)
 {
@@ -72,9 +113,13 @@ hal_i2c_status_t hal_i2c_write_timeout(uint8_t addr, const uint8_t *src, size_t 
     // 這能保證 Core 0 和 Core 1 不會同時操作硬體
     if (i2c_mutex != NULL)
     {
-        if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(50)) != pdTRUE)
+        TickType_t wait_time = pdMS_TO_TICKS(50);
+#ifdef I2C_PRIORITY_LAB
+        wait_time = portMAX_DELAY;  // 實驗模式：為了觀測反轉，無限制等待
+#endif
+        if (xSemaphoreTake(i2c_mutex, wait_time) != pdTRUE)
         {
-            return HAL_I2C_BUSY;  // 獲取鎖失敗，直接返回 Busy 讓上層決定是否重試
+            return HAL_I2C_BUSY;
         }
     }
 

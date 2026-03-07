@@ -6,6 +6,7 @@ add_library(app STATIC
     app_storage.c
     app_button.c
     app_sensor.c
+    app_priority_lab.c
 )
 
 target_include_directories(app PUBLIC

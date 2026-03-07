@@ -6,7 +6,7 @@
 * **Language:** C (Standard C99/C11)
 * **Build System:** CMake + Docker (Standardized Build Env)
 * **Testing:** Unity Framework (Unit Test) + Saleae/Oscilloscope (Physical Test)
-* **Current Phase:** Phase 3 - RTOS Architecture & Safety (Completed Day 13, Starting Day 14)
+* **Current Phase:** Phase 3 - RTOS Architecture & Safety (Completed Day 14, Starting Day 15)
 
 ## 2. Architecture & Design Patterns (Layered Architecture)
 We have refactored the system into a strict 3-layer architecture to ensure decoupling and testability.
@@ -87,24 +87,23 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
 
 ## 7. Next Steps (Phase 3: RTOS Architecture & Safety)
 
-**✅ Tasks Completed (Day 13 - IPC Patterns & ISR Decoupling):**
-* ✅ Implemented Direct Task Notification (`vTaskNotifyGiveFromISR`) to decouple GPIO interrupts from application logic.
-* ✅ Built a Deferred Handler Task (`vAppButtonTask`) with a 50ms timestamp-based software debounce.
-* ✅ Achieved 0-byte dynamic memory overhead for IPC and guaranteed ISR execution time < 5μs.
-* ✅ Eliminated `printf` and blocking operations from ISR, removing the risk of CPU starvation and SMP deadlocks.
+**✅ Tasks Completed (Day 14 - Mutex & Priority Inversion Focus):**
+* ✅ Constructed a strict Priority Inversion scenario using 4 tasks across Dual-Core SMP (1 HP, 2 MP, 1 LP).
+* ✅ Proved failure mode (3624ms blockage) with Binary Semaphores due to M-Task preemption.
+* ✅ Validated Priority Inheritance mechanism using FreeRTOS Mutex, successfully reducing H-Task block time to the theoretical minimum (611ms), guaranteeing real-time predictability.
 
-**Tasks (Day 14 - Mutex & Priority Inversion Focus):**
-1. **Priority Inversion Simulation:** Create a deliberate scenario where a low-priority task holds a resource (Mutex), a high-priority task waits for it, and a medium-priority task preempts the low-priority one.
-2. **Priority Inheritance Validation:** Demonstrate how FreeRTOS automatically promotes the low-priority task to resolve the deadlock, analyzing the RTOS trace or logs.
-
+**Tasks (Day 15 - Finite State Machine Focus):**
+1. **FSM Architecture:** Implement a hierarchical Finite State Machine using Function Pointer Tables to eliminate `if-else` spaghetti code.
+2. **State Decoupling:** Define strict state entry, exit, and transition actions, decoupled from hardware dependencies.
 ---
 
 ## 8. 🛠 Current Technical Debt
 
-### Resolved (Day 12 & Day 13 Focus)
-* ✅ **[Fixed] ISR to Task Communication:** Removed unsafe `printf` from ISR. Implemented FreeRTOS Direct Task Notification for safe, zero-overhead interrupt deferred processing.
+### Resolved (Day 12, 13, 14 Focus)
+* ✅ **[Fixed] ISR to Task Communication:** Removed unsafe `printf` from ISR. Implemented FreeRTOS Direct Task Notification.
 * ✅ **[Fixed] Thread Safety (I2C/SMP):** Implemented Mutex inside `hal_i2c`. Verified thread-safe execution without deadlocks.
-* ✅ **[Fixed] CMake Dependency Graph:** Properly enforced `FreeRTOS-Kernel` and `pico_stdio_usb` linkages at the HAL/App levels, solving `implicit declaration` errors.
+* ✅ **[Fixed] CMake Dependency Graph:** Properly enforced `FreeRTOS-Kernel` linkages, solving `implicit declaration` errors.
 
 ### Pending (Phase 3 & 4 Focus)
+* ⚠️ **[Medium] Lab Code in Production:** The `hal_i2c_lab_simulate_long_transfer` API is currently compiled into the HAL layer. Needs to be stripped out via CMake `target_compile_definitions` in Phase 4 before final integration.
 * ⚠️ **[High] CI/CD & Unit Test Breakage:** x86 Docker unit tests still cannot mock FreeRTOS APIs properly. Need to implement `mock_freertos.h` for GitHub Actions to pass.
