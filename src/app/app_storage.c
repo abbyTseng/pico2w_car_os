@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "app/app_fsm.h"
 #include "common/common_status.h"
 #include "hal/hal_storage.h"
 
@@ -39,6 +40,15 @@ void vMonitorTask(void *pvParameters)
 
     while (1)
     {
+        app_fsm_send_event(FSM_EVENT_INIT_DONE);
+        vTaskDelay(2000);
+        app_fsm_send_event(FSM_EVENT_START);
+        vTaskDelay(2000);
+        app_fsm_send_event(FSM_EVENT_ERROR);
+        vTaskDelay(2000);
+        app_fsm_send_event(FSM_EVENT_CLEAR_FAULT);
+        vTaskDelay(2000);
+
         // portGET_CORE_ID() 可以抓出現在在哪個核心執行
         printf("[Task Monitor] System OK. Executing on Core: %d\n", portGET_CORE_ID());
         vTaskDelayUntil(&xLastWakeTime, xFrequency);

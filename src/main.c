@@ -4,6 +4,7 @@
 #include "app/app_blink.h"
 #include "app/app_button.h"
 #include "app/app_display.h"
+#include "app/app_fsm.h"
 #include "app/app_priority_lab.h"
 #include "app/app_sensor.h"
 #include "app/app_storage.h"
@@ -46,6 +47,7 @@ int main(void)
     xTaskCreate(vMidPriorityTask, "PMID2_Task", 1024, (void *)2, 2, NULL);
     xTaskCreate(vLowPriorityTask, "PLOW_Task", 1024, NULL, 1, NULL);
 
+    xTaskCreate(vAppFsmTask, "FSM_Task", 1024, NULL, 3, NULL);
     vTaskStartScheduler();
 
     while (1);

@@ -6,7 +6,7 @@
 * **Language:** C (Standard C99/C11)
 * **Build System:** CMake + Docker (Standardized Build Env)
 * **Testing:** Unity Framework (Unit Test) + Saleae/Oscilloscope (Physical Test)
-* **Current Phase:** Phase 3 - RTOS Architecture & Safety (Completed Day 14, Starting Day 15)
+* **Current Phase:** Phase 3 - RTOS Architecture & Safety (Completed Day 15, Starting Day 16)
 
 ## 2. Architecture & Design Patterns (Layered Architecture)
 We have refactored the system into a strict 3-layer architecture to ensure decoupling and testability.
@@ -20,11 +20,12 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
 * **Constraint:** **NO** direct hardware manipulation logic or original SDK includes (like `pico/stdlib.h`) allowed here. Super loop replaced by RTOS Tasks.
 
 ### B. App Layer (`src/app/`)
-* **Role:** Business Logic (e.g., `app_display`, `app_storage`, `app_button`).
+* **Role:** Business Logic (e.g., `app_display`, `app_storage`, `app_button`, `app_fsm`).
 * **Responsibilities:**
     * Encapsulated into standard FreeRTOS task functions (`vAppDisplayTask`, etc.).
     * Utilizes absolute timing (`vTaskDelayUntil`) for Hard Real-time RMS execution.
     * Utilizes Deferred Interrupt Processing (`vAppButtonTask`) for software debouncing without blocking the CPU.
+    * Executes a decoupled, Table-Driven Finite State Machine (`app_fsm`) driven by an RTOS message queue.
     * Calls HAL interfaces using `common_status_t`.
 * **Constraint:** Hardware-agnostic. Should run on any MCU if HAL is provided. FreeRTOS API usage is restricted to `.c` files, never in `.h` headers.
 
@@ -87,14 +88,15 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
 
 ## 7. Next Steps (Phase 3: RTOS Architecture & Safety)
 
-**✅ Tasks Completed (Day 14 - Mutex & Priority Inversion Focus):**
-* ✅ Constructed a strict Priority Inversion scenario using 4 tasks across Dual-Core SMP (1 HP, 2 MP, 1 LP).
-* ✅ Proved failure mode (3624ms blockage) with Binary Semaphores due to M-Task preemption.
-* ✅ Validated Priority Inheritance mechanism using FreeRTOS Mutex, successfully reducing H-Task block time to the theoretical minimum (611ms), guaranteeing real-time predictability.
+**✅ Tasks Completed (Day 15 - Finite State Machine Focus):**
+* ✅ Implemented an $O(1)$ Table-Driven Finite State Machine utilizing a 2D array of Function Pointers.
+* ✅ Decoupled the FSM engine into a dedicated FreeRTOS Task (`vAppFsmTask`) driven by a thread-safe Event Queue, achieving 0% CPU load when idle.
+* ✅ Eliminated `switch-case` cyclomatic complexity and demonstrated defensive programming by gracefully ignoring out-of-sequence events (e.g., `Invalid Event 0 in State 1`).
 
-**Tasks (Day 15 - Finite State Machine Focus):**
-1. **FSM Architecture:** Implement a hierarchical Finite State Machine using Function Pointer Tables to eliminate `if-else` spaghetti code.
-2. **State Decoupling:** Define strict state entry, exit, and transition actions, decoupled from hardware dependencies.
+**Tasks (Day 16 - Event Groups & Sync Focus):**
+1. **Multi-condition Sync:** Replace global boolean flags with FreeRTOS Event Groups.
+2. **Boot Synchronization:** Implement an AND-logic barrier to ensure the system only enters the `RUNNING` state when Storage, Display, and Sensors are all concurrently ready.
+
 ---
 
 ## 8. 🛠 Current Technical Debt
@@ -105,5 +107,6 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
 * ✅ **[Fixed] CMake Dependency Graph:** Properly enforced `FreeRTOS-Kernel` linkages, solving `implicit declaration` errors.
 
 ### Pending (Phase 3 & 4 Focus)
+* ⚠️ **[Medium] ISR to FSM Communication:** `app_fsm_send_event()` currently only supports Task-level context via `xQueueSend`. If hardware interrupts (e.g., GPIO EXTI) need to directly trigger FSM state changes in the future, a dedicated `app_fsm_send_event_from_isr()` utilizing `xQueueSendFromISR` must be introduced to avoid RTOS assertion failures.
 * ⚠️ **[Medium] Lab Code in Production:** The `hal_i2c_lab_simulate_long_transfer` API is currently compiled into the HAL layer. Needs to be stripped out via CMake `target_compile_definitions` in Phase 4 before final integration.
 * ⚠️ **[High] CI/CD & Unit Test Breakage:** x86 Docker unit tests still cannot mock FreeRTOS APIs properly. Need to implement `mock_freertos.h` for GitHub Actions to pass.

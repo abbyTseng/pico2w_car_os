@@ -7,6 +7,8 @@ add_library(app STATIC
     app_button.c
     app_sensor.c
     app_priority_lab.c
+    app_fsm.c 
+    app_fsm_table.c
 )
 
 target_include_directories(app PUBLIC
