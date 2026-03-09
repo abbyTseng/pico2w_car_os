@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "app/app_fsm.h"
+#include "app_sync.h"
 #include "common/common_status.h"
 #include "hal/hal_storage.h"
 
@@ -30,27 +31,28 @@ common_status_t app_storage_log_boot(void)
 // --- 背景監控 Task ---
 void vMonitorTask(void *pvParameters)
 {
-    (void)pvParameters;  // 忽略未使用參數
+    (void)pvParameters;
 
-    // 開機時記錄一次
     app_storage_log_boot();
 
+    // === 模擬各模組初始化所需的時間差異 ===
+    vTaskDelay(pdMS_TO_TICKS(500));
+    app_sync_report_ready(SYNC_BIT_DISPLAY_READY);
+
+    vTaskDelay(pdMS_TO_TICKS(800));
+    app_sync_report_ready(SYNC_BIT_STORAGE_READY);
+
+    vTaskDelay(pdMS_TO_TICKS(400));
+    app_sync_report_ready(SYNC_BIT_SENSOR_READY);
+    // ===================================
+
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(1000);  // 1000ms 週期
+    const TickType_t xFrequency = pdMS_TO_TICKS(5000);
 
     while (1)
     {
-        app_fsm_send_event(FSM_EVENT_INIT_DONE);
-        vTaskDelay(2000);
-        app_fsm_send_event(FSM_EVENT_START);
-        vTaskDelay(2000);
-        app_fsm_send_event(FSM_EVENT_ERROR);
-        vTaskDelay(2000);
-        app_fsm_send_event(FSM_EVENT_CLEAR_FAULT);
-        vTaskDelay(2000);
-
-        // portGET_CORE_ID() 可以抓出現在在哪個核心執行
-        printf("[Task Monitor] System OK. Executing on Core: %d\n", portGET_CORE_ID());
+        // 進入穩態，不再亂發 Event 干擾 FSM
+        printf("[Task Monitor] System OK. Core: %d\n", portGET_CORE_ID());
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }

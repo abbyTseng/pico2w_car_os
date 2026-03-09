@@ -8,6 +8,7 @@
 #include "app/app_priority_lab.h"
 #include "app/app_sensor.h"
 #include "app/app_storage.h"
+#include "app/app_sync.h"
 #include "hal/hal_delay.h"
 #include "hal/hal_init.h"
 #include "task.h"
@@ -22,7 +23,8 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 int main(void)
 {
     hal_init_system();
-
+    // 【新增】初始化啟動同步屏障 (必須在 Task 建立前完成)
+    app_sync_init();
     // 透過 HAL 介面輪詢，完全不知道底層是哪家 MCU
     while (!hal_init_is_usb_connected())
     {

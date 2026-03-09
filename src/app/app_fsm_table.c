@@ -24,7 +24,9 @@ const fsm_transition_t g_fsm_table[FSM_STATE_MAX][FSM_EVENT_MAX] = {
     //    [事件] = {目標狀態, 動作函數}
     // }
 
-    [FSM_STATE_INIT] = {[FSM_EVENT_INIT_DONE] = {FSM_STATE_IDLE, action_init_to_idle}},
+    [FSM_STATE_INIT] = {[FSM_EVENT_INIT_DONE] = {FSM_STATE_IDLE, action_init_to_idle},
+                        // 【新增】開機同步屏障失敗 (Timeout/Error) 時的逃生路線
+                        [FSM_EVENT_ERROR] = {FSM_STATE_FAULT, action_handle_fault}},
 
     [FSM_STATE_IDLE] = {[FSM_EVENT_START] = {FSM_STATE_RUNNING, action_start_running},
                         [FSM_EVENT_OTA_TRIGGER] = {FSM_STATE_OTA, NULL}},

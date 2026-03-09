@@ -9,6 +9,7 @@ add_library(app STATIC
     app_priority_lab.c
     app_fsm.c 
     app_fsm_table.c
+    app_sync.c
 )
 
 target_include_directories(app PUBLIC
