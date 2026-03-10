@@ -6,7 +6,7 @@
 * **Language:** C (Standard C99/C11)
 * **Build System:** CMake + Docker (Standardized Build Env)
 * **Testing:** Unity Framework (Unit Test) + Saleae/Oscilloscope (Physical Test)
-* **Current Phase:** Phase 3 - RTOS Architecture & Safety (Completed Day 16, Starting Day 17)
+* **Current Phase:** Phase 4 - Security & Connectivity (Completed Day 17, Starting Day 18)
 
 ## 2. Architecture & Design Patterns (Layered Architecture)
 We have refactored the system into a strict 3-layer architecture to ensure decoupling and testability.
@@ -38,6 +38,7 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
     * **`hal_init`:** Wraps SDK specific modules (e.g., `pico_stdio_usb`) to prevent leaky abstractions.
     * **`hal_led`:** Abstracts Pico 2W's CYW43 wireless LED control.
     * **`hal_storage`:** Abstraction for LittleFS on Flash with XIP protection.
+    * **`hal_fault`:** Implements Cortex-M33 HardFault interception via naked assembly. Securely stores Exception Frame (PC, LR) into `.uninitialized_data` (No-Init RAM) and triggers `NVIC_SystemReset()` to avoid Watchdog conflicts.
 
 ---
 
@@ -87,18 +88,20 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
 
 ---
 
-## 7. Next Steps (Phase 3: RTOS Architecture & Safety)
+## 7. Next Steps (Phase 3 & 4 Transition)
 
-**✅ Tasks Completed (Day 15 & 16 - FSM & Synchronization):**
+**✅ Tasks Completed (Day 15, 16, 17 - FSM, Sync & Crash Analysis):**
 * ✅ Implemented an $O(1)$ Table-Driven Finite State Machine utilizing a 2D array of Function Pointers.
 * ✅ Decoupled the FSM engine into a dedicated FreeRTOS Task (`vAppFsmTask`) driven by a thread-safe Event Queue.
 * ✅ **[Day 16]** Implemented the `app_sync` module using FreeRTOS Event Groups to create a thread-safe Boot Synchronization Barrier.
 * ✅ **[Day 16]** Eliminated `while(!ready)` polling, reducing CPU load to 0% (Blocked state) during the boot waiting period.
-* ✅ **[Day 16]** Integrated AND Logic (all ready) with OR Logic (any error) to realize a Fast-Fail mechanism, successfully validating that the FSM transitions to `FAULT` safely upon a 3000ms timeout.
+* ✅ **[Day 16]** Integrated AND Logic (all ready) with OR Logic (any error) to realize a Fast-Fail mechanism.
+* ✅ **[Day 17] HardFault Handler:** Implemented an ARM Cortex-M33 specific HardFault exception handler using inline assembly to evaluate `EXC_RETURN` (MSP vs PSP).
+* ✅ [Fixed] **[Day 17] Post-mortem Dump:** Extracted and dumped CPU Registers (PC, LR) to `.uninitialized_data` (No-Init RAM) for offline crash analysis using `addr2line`.
 
-**Tasks (Day 17 - System Crash Analysis Focus):**
-1. **HardFault Handler:** Implement an ARM Cortex-M33 specific HardFault exception handler.
-2. **Post-mortem Dump:** Extract and dump CPU Registers (PC, LR, MSP) to persistent storage (Flash) for offline crash analysis.
+**Tasks (Day 18 - Watchdog Strategies):**
+1. **Window Watchdog (WWDT):** Implement hardware watchdog initialization.
+2. **Task Monitor:** Implement a software watchdog mechanism to monitor RTOS task starvation and deadlocks.
 
 ---
 
@@ -114,3 +117,5 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
 * ⚠️ **[Medium] ISR to FSM Communication:** `app_fsm_send_event()` currently only supports Task-level context via `xQueueSend`. If hardware interrupts (e.g., GPIO EXTI) need to directly trigger FSM state changes in the future, a dedicated `app_fsm_send_event_from_isr()` utilizing `xQueueSendFromISR` must be introduced to avoid RTOS assertion failures.
 * ⚠️ **[Medium] Lab Code in Production:** The `hal_i2c_lab_simulate_long_transfer` API is currently compiled into the HAL layer. Needs to be stripped out via CMake `target_compile_definitions` in Phase 4 before final integration.
 * ⚠️ **[High] CI/CD & Unit Test Breakage:** x86 Docker unit tests still cannot mock FreeRTOS APIs properly. Need to implement `mock_freertos.h` for GitHub Actions to pass.
+* ⚠️ **[Medium] Crash Log Persistence (Day 17):** Currently, the `hal_fault` crash report is only stored in No-Init RAM (survives Warm Reset). It needs to be written to LittleFS in `hal_fault_check_and_log_crash()` to survive a Cold Boot.
+* ⚠️ **[Low] FPU Extended Frame Handling (Day 17):** RP2350 has hardware FPU enabled. If a crash occurs while the FPU is in use (`EXC_RETURN` bit 4 is 0), the hardware pushes an extended frame (S0-S15). The current PC offset calculation assumes a standard frame. Needs dynamic offset adjustment for future robustness.

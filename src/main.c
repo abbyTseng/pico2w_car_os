@@ -10,6 +10,7 @@
 #include "app/app_storage.h"
 #include "app/app_sync.h"
 #include "hal/hal_delay.h"
+#include "hal/hal_fault.h"
 #include "hal/hal_init.h"
 #include "task.h"
 
@@ -23,6 +24,7 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 int main(void)
 {
     hal_init_system();
+
     // 【新增】初始化啟動同步屏障 (必須在 Task 建立前完成)
     app_sync_init();
     // 透過 HAL 介面輪詢，完全不知道底層是哪家 MCU
@@ -34,6 +36,18 @@ int main(void)
 
     printf("\n\n=== [SYSTEM START: FreeRTOS SMP Dual-Core] ===\n");
 
+    hal_fault_check_and_log_crash();  // 檢查前一次是否是死機重啟
+    // 讀取 Cortex-M33 的 CPACR 暫存器
+    uint32_t cpacr = *(volatile uint32_t *)0xE000ED88;
+    printf("CPACR Register: 0x%08X\n", (unsigned int)cpacr);
+    if ((cpacr & (0xF << 20)) == (0xF << 20))
+    {
+        printf("[Architecture] FPU is ENABLED in Hardware!\n");
+    }
+    else
+    {
+        printf("[Architecture] FPU is DISABLED.\n");
+    }
     // 【關鍵修復】Stack 統一放大到 1024 Words (4KB)，解決 CYW43 與 OLED 初始化的記憶體不足
     xTaskCreate(vAppDisplayTask, "OLED_Task", 1024, NULL, 3, NULL);
     xTaskCreate(vAppBlinkTask, "LED_Task", 1024, NULL, 2, NULL);
