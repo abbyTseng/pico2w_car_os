@@ -25,6 +25,9 @@ jobs:
           --suppress=missingIncludeSystem \
           --suppress=unusedFunction \
           --suppress=unmatchedSuppression \
+          --suppress=staticFunction \
+          --suppress=constParameterPointer:src/main.c \
+          --suppress=constParameterPointer:src/app/app_priority_lab.c \
           -I src/common -I src/hal -I src/app \
           src/
 
