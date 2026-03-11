@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          submodules: recursive  # <--- 【關鍵新增】告訴 GitHub 把 FreeRTOS 等子模組也一起拉下來！
       - name: Install Cppcheck
         run: sudo apt-get update && sudo apt-get install -y cppcheck
 
@@ -37,7 +38,8 @@ jobs:
     needs: static-analysis
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          submodules: recursive  # <--- 【關鍵新增】告訴 GitHub 把 FreeRTOS 等子模組也一起拉下來！
       - name: Install CMake & GCC
         run: sudo apt-get update && sudo apt-get install -y cmake build-essential
 
@@ -62,7 +64,8 @@ jobs:
     needs: unit-test # 測試都過了，才真的去編譯韌體
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          submodules: recursive  # <--- 【關鍵新增】告訴 GitHub 把 FreeRTOS 等子模組也一起拉下來！
       # 安裝 ARM Cross Compiler
       - name: Install Toolchain
         run: |
