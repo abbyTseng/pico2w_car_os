@@ -23,5 +23,5 @@ src/ON/
 build_test_docker/
 build_rp2350/
 
-external/
+#external/
 build_test_host/
