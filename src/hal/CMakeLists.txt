@@ -10,6 +10,7 @@ add_library(hal STATIC
     hal_i2c.c
     hal_storage.c
     hal_fault.c
+    hal_wdt.c
     # 直接加入 littlefs 源碼
     ${CMAKE_SOURCE_DIR}/external/littlefs/lfs.c
     ${CMAKE_SOURCE_DIR}/external/littlefs/lfs_util.c

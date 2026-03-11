@@ -4,6 +4,7 @@
 
 #include "FreeRTOS.h"
 #include "app_fsm_table.h"
+#include "app_monitor.h"
 #include "app_sync.h"  // 引入同步屏障
 #include "queue.h"
 
@@ -52,7 +53,7 @@ void vAppFsmTask(void *pvParameters)
     while (1)
     {
         // 等待事件到來 (無限期阻塞，釋放 CPU 給其他 Task)
-        if (xQueueReceive(xFsmQueue, &incoming_event, portMAX_DELAY) == pdPASS)
+        if (xQueueReceive(xFsmQueue, &incoming_event, pdMS_TO_TICKS(50)) == pdPASS)
         {
             // 安全防護：檢查 Event 是否越界
             if (incoming_event >= FSM_EVENT_MAX) continue;
@@ -83,6 +84,12 @@ void vAppFsmTask(void *pvParameters)
                 printf("[FSM Warning] Invalid Event %d in State %d. Ignored.\n", incoming_event,
                        current_state);
             }
+        }
+        else
+        {
+            // Timeout 了，代表 50ms 內沒事件發生，系統閒置中。
+            // 我們依然要舉起心跳，告訴 WDT "我是閒著，不是當機"
+            app_monitor_report_heartbeat(HEARTBEAT_BIT_FSM);
         }
     }
 }

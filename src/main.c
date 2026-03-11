@@ -5,9 +5,9 @@
 #include "app/app_button.h"
 #include "app/app_display.h"
 #include "app/app_fsm.h"
+#include "app/app_monitor.h"
 #include "app/app_priority_lab.h"
 #include "app/app_sensor.h"
-#include "app/app_storage.h"
 #include "app/app_sync.h"
 #include "hal/hal_delay.h"
 #include "hal/hal_fault.h"
@@ -51,17 +51,17 @@ int main(void)
     // 【關鍵修復】Stack 統一放大到 1024 Words (4KB)，解決 CYW43 與 OLED 初始化的記憶體不足
     xTaskCreate(vAppDisplayTask, "OLED_Task", 1024, NULL, 3, NULL);
     xTaskCreate(vAppBlinkTask, "LED_Task", 1024, NULL, 2, NULL);
-    xTaskCreate(vMonitorTask, "MON_Task", 1024, NULL, 1, NULL);
+    xTaskCreate(vAppMonitorTask, "MON_Task", 1024, NULL, 1, NULL);
     xTaskCreate(vAppButtonTask, "BTN_Task", 1024, NULL, 4, NULL);
     // 注意：消費者優先權設得比生產者高，確保資料一生產出來立刻被處理
     // xTaskCreate(vAppSensorProducerTask, "SNS_Prod", 1024, NULL, 2, NULL);
     // xTaskCreate(vAppSensorConsumerTask, "SNS_Cons", 1024, NULL, 3, NULL);
     // Day14 Test priority
-    xTaskCreate(vHighPriorityTask, "PHI_Task", 1024, NULL, 3, NULL);
+    // xTaskCreate(vHighPriorityTask, "PHI_Task", 1024, NULL, 3, NULL);
     // 建立兩個 MP Task 來癱瘓雙核！
-    xTaskCreate(vMidPriorityTask, "PMID1_Task", 1024, (void *)1, 2, NULL);
-    xTaskCreate(vMidPriorityTask, "PMID2_Task", 1024, (void *)2, 2, NULL);
-    xTaskCreate(vLowPriorityTask, "PLOW_Task", 1024, NULL, 1, NULL);
+    // xTaskCreate(vMidPriorityTask, "PMID1_Task", 1024, (void *)1, 2, NULL);
+    // xTaskCreate(vMidPriorityTask, "PMID2_Task", 1024, (void *)2, 2, NULL);
+    // xTaskCreate(vLowPriorityTask, "PLOW_Task", 1024, NULL, 1, NULL);
 
     xTaskCreate(vAppFsmTask, "FSM_Task", 1024, NULL, 3, NULL);
     vTaskStartScheduler();

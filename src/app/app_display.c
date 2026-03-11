@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "FreeRTOS.h"
+#include "app_monitor.h"
 #include "common/common_status.h"
 #include "hal/hal_i2c.h"
 #include "pico/stdlib.h"
@@ -136,6 +137,7 @@ void vAppDisplayTask(void *pvParameters)
 
     while (1)
     {
+        app_monitor_report_heartbeat(HEARTBEAT_BIT_DISPLAY);  // <--- [新增] 每一輪報平安
         // 這裡會呼叫 hal_i2c_write，底層會自動 Take/Give Mutex！
         app_display_show_day10();
 

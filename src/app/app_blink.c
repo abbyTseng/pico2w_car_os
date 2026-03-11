@@ -35,8 +35,8 @@ void vAppBlinkTask(void *pvParameters)
 
         printf("[Task LED] Toggled. Executing on Core: %d\n", portGET_CORE_ID());
         // Day16 mission:💀 致命劇毒：對無效的記憶體位址進行寫入
-        volatile uint32_t *fatal_ptr = (volatile uint32_t *)0xDEADBEEF;
-        *fatal_ptr = 0xBAD;  // 保證死機！                  // 強制寫入，觸發 HardFault
+        // volatile uint32_t *fatal_ptr = (volatile uint32_t *)0xDEADBEEF;
+        //*fatal_ptr = 0xBAD;  // 保證死機！                  // 強制寫入，觸發 HardFault
 
         // 使用 vTaskDelayUntil 避免 Jitter
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
