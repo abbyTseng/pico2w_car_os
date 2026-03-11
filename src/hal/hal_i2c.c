@@ -113,10 +113,7 @@ hal_i2c_status_t hal_i2c_write_timeout(uint8_t addr, const uint8_t *src, size_t 
     // 這能保證 Core 0 和 Core 1 不會同時操作硬體
     if (i2c_mutex != NULL)
     {
-        TickType_t wait_time = pdMS_TO_TICKS(50);
-#ifdef I2C_PRIORITY_LAB
-        wait_time = portMAX_DELAY;  // 實驗模式：為了觀測反轉，無限制等待
-#endif
+        TickType_t wait_time = portMAX_DELAY;  // 實驗模式：為了觀測反轉，無限制等待
         if (xSemaphoreTake(i2c_mutex, wait_time) != pdTRUE)
         {
             return HAL_I2C_BUSY;

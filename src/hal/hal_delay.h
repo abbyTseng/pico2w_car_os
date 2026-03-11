@@ -7,14 +7,15 @@
 #define HAL_DELAY_H
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 #include <stdint.h>  // <--- 關鍵！少了這一行編譯器就不認識 uint32_t
-/**
- * Block for approximately ms milliseconds.
- * @param ms Delay in milliseconds
- */
-void hal_delay_ms(uint32_t ms);
+    /**
+     * Block for approximately ms milliseconds.
+     * @param ms Delay in milliseconds
+     */
+    void hal_delay_ms(uint32_t ms);
 
 #ifdef __cplusplus
 }

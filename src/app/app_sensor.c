@@ -77,7 +77,7 @@ void vAppSensorConsumerTask(void *pvParameters)
             {
                 printf("[SENSOR_CONSUMER] ✅ Received! ID: %d, ADC: %u, Time: %lu ms\n",
                        received_data.sensor_id, received_data.adc_value,
-                       received_data.timestamp_ms);
+                       (unsigned long)received_data.timestamp_ms);
             }
         }
         else

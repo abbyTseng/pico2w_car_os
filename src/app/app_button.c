@@ -77,7 +77,7 @@ void vAppButtonTask(void *pvParameters)
         if ((xCurrentTime - xLastWakeTime) > pdMS_TO_TICKS(DEBOUNCE_TIME_MS))
         {
             press_count++;
-            printf("[APP_BUTTON] Valid Press Detected! Count: %lu\n", press_count);
+            printf("[APP_BUTTON] Valid Press Detected! Count: %lu\n", (unsigned long)press_count);
 
             // 更新最後一次有效觸發的時間戳
             xLastWakeTime = xCurrentTime;

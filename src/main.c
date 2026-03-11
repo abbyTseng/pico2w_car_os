@@ -14,6 +14,7 @@
 #include "hal/hal_init.h"
 #include "task.h"
 
+// cppcheck-suppress constParameterPointer
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
     (void)xTask;

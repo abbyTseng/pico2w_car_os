@@ -6,7 +6,8 @@
 #ifndef COMMON_STATUS_H
 #define COMMON_STATUS_H
 
-typedef enum {
+typedef enum
+{
     COMMON_OK = 0,
     COMMON_ERR = -1,
     COMMON_ERR_PARAM,

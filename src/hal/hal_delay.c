@@ -7,6 +7,4 @@
 
 #include "pico/stdlib.h"
 
-void hal_delay_ms(uint32_t ms) {
-    sleep_ms(ms);
-}
+void hal_delay_ms(uint32_t ms) { sleep_ms(ms); }

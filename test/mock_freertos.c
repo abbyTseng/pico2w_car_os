@@ -62,3 +62,16 @@ EventBits_t xEventGroupWaitBits(EventGroupHandle_t xEventGroup, const EventBits_
     (void)xTicksToWait;
     return uxBitsToWaitFor;  // 直接假裝等到了
 }
+
+SemaphoreHandle_t xSemaphoreCreateMutex(void) { return (SemaphoreHandle_t)1; }
+BaseType_t xSemaphoreTake(SemaphoreHandle_t xMutex, TickType_t xBlockTime)
+{
+    (void)xMutex;
+    (void)xBlockTime;
+    return pdTRUE;
+}
+BaseType_t xSemaphoreGive(SemaphoreHandle_t xMutex)
+{
+    (void)xMutex;
+    return pdTRUE;
+}

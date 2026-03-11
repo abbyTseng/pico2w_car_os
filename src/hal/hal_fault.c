@@ -17,7 +17,7 @@
 __attribute__((section(".uninitialized_data"))) crash_report_t g_crash_report;
 
 // 2. C 語言處理函數 (由組合語言跳轉過來)
-void hal_fault_c_handler(uint32_t *fault_stack)
+void hal_fault_c_handler(const uint32_t *fault_stack)
 {
     // 發生崩潰了，先把中斷全關，避免被其他 ISR 干擾
     __asm volatile("cpsid i");
@@ -64,9 +64,9 @@ void hal_fault_check_and_log_crash(void)
         printf("\n========================================\n");
         printf("🔥 [FATAL] PREVIOUS CRASH DETECTED! 🔥\n");
         printf("========================================\n");
-        printf("Fault Type: %lu\n", g_crash_report.fault_type);
-        printf("PC (Crash Address): 0x%08lX\n", g_crash_report.frame.pc);
-        printf("LR (Return Address): 0x%08lX\n", g_crash_report.frame.lr);
+        printf("Fault Type: %lu\n", (unsigned long)g_crash_report.fault_type);
+        printf("PC (Crash Address): 0x%08X\n", (unsigned int)g_crash_report.frame.pc);
+        printf("LR (Return Address): 0x%08X\n", (unsigned int)g_crash_report.frame.lr);
         printf("========================================\n");
 
         // 【第二階段：安全落地】這時候系統已經安穩重啟，我們安全地將資料寫入 LittleFS
@@ -98,8 +98,8 @@ void hal_fault_check_and_log_crash(void)
             printf("\n========================================\n");
             printf("📂 [HISTORY] SAVED CRASH LOG FOUND IN FLASH \n");
             printf("========================================\n");
-            printf("PC (Crash Address): 0x%08lX\n", saved_report.frame.pc);
-            printf("LR (Return Address): 0x%08lX\n", saved_report.frame.lr);
+            printf("PC (Crash Address): 0x%08X\n", (unsigned int)saved_report.frame.pc);
+            printf("LR (Return Address): 0x%08X\n", (unsigned int)saved_report.frame.lr);
             printf("========================================\n\n");
         }
     }
