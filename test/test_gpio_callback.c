@@ -64,7 +64,7 @@ void tearDown(void) {}
 void test_hal_gpio_set_callback_should_store_function_pointer(void)
 {
     // Act
-    hal_gpio_set_callback(mock_app_handler);
+    hal_gpio_set_isr_callback(mock_app_handler);
 
     // Assert: 檢查 static 變數是否等於我們傳進去的函式
     TEST_ASSERT_EQUAL_PTR(mock_app_handler, _app_callback);
@@ -74,7 +74,7 @@ void test_hal_gpio_set_callback_should_store_function_pointer(void)
 void test_internal_isr_should_trigger_app_callback(void)
 {
     // Arrange
-    hal_gpio_set_callback(mock_app_handler);
+    hal_gpio_set_isr_callback(mock_app_handler);
 
     // Act: 直接呼叫 static ISR (模擬硬體行為)
     // 因為 mock/pico/stdlib.h 定義了 uint，這裡編譯器就能正確識別參數了

@@ -37,6 +37,7 @@ add_executable(test_blink
     mock_hal_delay.c
     mock_hal_multicore.c
     mock_hal_gpio.c
+    mock_freertos.c
     # 如果 app_blink.c 有用到 hal_gpio，這裡可能也要補上 mock/hardware/gpio.h 的路徑依賴
 )
 target_link_libraries(test_blink unity)
@@ -51,12 +52,23 @@ add_executable(test_gpio_callback
 )
 target_link_libraries(test_gpio_callback unity)
 add_test(NAME test_gpio_callback COMMAND test_gpio_callback)
+# ==============================================================================
+# 5. Day 7 的測試: test_ringbuffer
+# ==============================================================================
+# (如果你還沒寫 test_ringbuffer.c，這段可以先註解掉，不然會報錯找不到檔案)
+# add_executable(test_ringbuffer
+#    test_ringbuffer.c
+#    ../src/common/common_ringbuffer.c
+# )
+# target_link_libraries(test_ringbuffer unity)
+# add_test(NAME test_ringbuffer COMMAND test_ringbuffer)
 
 # ==============================================================================
 # 6. Day 9 新增的測試: test_hal_i2c (Bus Recovery)
 # ==============================================================================
 add_executable(test_hal_i2c
     test_hal_i2c.c
+    mock_freertos.c
     # 注意：我們不加入 ../src/hal/hal_i2c.c，因為它已經被 include 在 .c 檔裡了 (白箱測試)
 )
 target_link_libraries(test_hal_i2c unity)
@@ -69,6 +81,7 @@ add_test(NAME test_hal_i2c COMMAND test_hal_i2c)
 add_executable(test_app_storage
     test_app_storage.c
     mock_hal_storage.c          # 連結 Mock HAL
+    mock_freertos.c
 # 修改這裡：使用相對路徑，不要用 CMAKE_SOURCE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/app/app_storage.c
 )
@@ -77,13 +90,19 @@ target_include_directories(test_app_storage PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 add_test(NAME test_app_storage COMMAND test_app_storage)
+
+
 # ==============================================================================
-# 5. Day 7 的測試: test_ringbuffer
+# 7. Day 18 新增: test_app_monitor (軟體看門狗邏輯驗證)
 # ==============================================================================
-# (如果你還沒寫 test_ringbuffer.c，這段可以先註解掉，不然會報錯找不到檔案)
-# add_executable(test_ringbuffer
-#    test_ringbuffer.c
-#    ../src/common/common_ringbuffer.c
-# )
-# target_link_libraries(test_ringbuffer unity)
-# add_test(NAME test_ringbuffer COMMAND test_ringbuffer)
+add_executable(test_app_monitor
+    test_app_monitor.c
+    ../src/app/app_monitor.c
+    mock_freertos.c
+    mock_hal_wdt.c          # <--- 【重點新增】掛載假看門狗
+)
+target_link_libraries(test_app_monitor unity)
+target_include_directories(test_app_monitor PRIVATE 
+    ${CMAKE_SOURCE_DIR}/src
+)
+add_test(NAME test_app_monitor COMMAND test_app_monitor)

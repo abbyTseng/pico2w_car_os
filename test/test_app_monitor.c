@@ -33,3 +33,12 @@ void test_app_monitor_early_kick_should_not_kick(void)
     bool should_kick = app_monitor_evaluate_system_state(bits, elapsed_ms);
     TEST_ASSERT_FALSE_MESSAGE(should_kick, "Early kick detected, must NOT kick WDT.");
 }
+// 【新增】Unity 測試進入點
+int main(void)
+{
+    UNITY_BEGIN();
+    RUN_TEST(test_app_monitor_all_tasks_alive_should_kick);
+    RUN_TEST(test_app_monitor_fsm_dead_should_not_kick);
+    RUN_TEST(test_app_monitor_early_kick_should_not_kick);
+    return UNITY_END();
+}

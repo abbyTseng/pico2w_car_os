@@ -13,7 +13,7 @@ void hal_gpio_init_output(uint32_t pin)
     (void)pin;  // 假裝初始化了
 }
 
-void hal_gpio_set_callback(hal_gpio_callback_t callback)
+void hal_gpio_set_isr_callback(hal_gpio_isr_callback_t callback)
 {
     (void)callback;  // 假裝註冊了，實際上不存
 }
