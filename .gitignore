@@ -24,3 +24,4 @@ build_test_docker/
 build_rp2350/
 
 external/
+build_test_host/

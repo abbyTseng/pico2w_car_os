@@ -34,12 +34,12 @@ repos:
         ]
         pass_filenames: false
 
-      # --- 3. 單元測試防線 (⚠️ 暫時註解：等待 mock_freertos.h 完成後再開啟) ---
-      # - id: docker-unit-test
-      #   name: 🐳 Docker Unit Tests (Unity)
-      #   entry: ./scripts/run_tests.sh
-      #   language: system
-      #   pass_filenames: false
-      #   always_run: true
+# --- 3. 單元測試防線 (✅ 封印解除：現在有 Mock 護體了) ---
+      - id: docker-unit-test
+        name: 🐳 Docker Unit Tests (Unity)
+        entry: ./scripts/run_tests.sh
+        language: system
+        pass_filenames: false
+        always_run: true
 
 exclude: ^lib/|^test/|^build/|^src/ON/|^external/

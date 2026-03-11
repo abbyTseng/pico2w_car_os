@@ -1,5 +1,6 @@
 #include "mock/event_groups.h"
 #include "mock/queue.h"
+#include "mock/semphr.h"
 #include "mock/task.h"
 
 // --- Dummy Task Functions ---
