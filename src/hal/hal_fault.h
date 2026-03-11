@@ -25,7 +25,7 @@ typedef struct
 } crash_report_t;
 
 // 供組合語言呼叫的 C 語言入口
-void hal_fault_c_handler(uint32_t *fault_stack);
+void hal_fault_c_handler(const uint32_t *fault_stack);
 
 // 供 main.c 在開機時檢查是否有崩潰紀錄
 void hal_fault_check_and_log_crash(void);
