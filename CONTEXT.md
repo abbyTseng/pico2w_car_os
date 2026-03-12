@@ -6,7 +6,7 @@
 * **Language:** C (Standard C99/C11)
 * **Build System:** CMake + Docker (Standardized Build Env)
 * **Testing:** Unity Framework (Unit Test) + Saleae/Oscilloscope (Physical Test)
-* **Current Phase:** Phase 4 - Security & Connectivity (Completed Day 18, Pausing for DevOps Tech Debt Resolution)
+* **Current Phase:** Phase 5 - Diagnostics & UDS (Phase 4 Security, Reliability & DevOps Completed)
 
 ## 2. Architecture & Design Patterns (Layered Architecture)
 We have refactored the system into a strict 3-layer architecture to ensure decoupling and testability.
@@ -20,115 +20,104 @@ We have refactored the system into a strict 3-layer architecture to ensure decou
 * **Constraint:** **NO** direct hardware manipulation logic or original SDK includes (like `pico/stdlib.h`) allowed here. Super loop replaced by RTOS Tasks.
 
 ### B. App Layer (`src/app/`)
-* **Role:** Business Logic (e.g., `app_display`, `app_storage`, `app_button`, `app_fsm`, `app_sync`, `app_monitor`).
+* **Role:** Business Logic (e.g., `app_display`, `app_storage`, `app_button`, `app_fsm`, `app_sync`, `app_monitor`, `app_sensor`).
 * **Responsibilities:**
-    * Encapsulated into standard FreeRTOS task functions (`vAppDisplayTask`, etc.).
+    * Encapsulated into standard FreeRTOS task functions.
     * Utilizes absolute timing (`vTaskDelayUntil`) for Hard Real-time RMS execution.
-    * Utilizes Deferred Interrupt Processing (`vAppButtonTask`) for software debouncing without blocking the CPU.
-    * Executes a decoupled, Table-Driven Finite State Machine (`app_fsm`) driven by an RTOS message queue.
+    * Utilizes Deferred Interrupt Processing (`vAppButtonTask`) for software debouncing.
+    * Executes a decoupled, Table-Driven Finite State Machine (`app_fsm`).
     * Centralizes cross-task synchronization via `app_sync` using FreeRTOS Event Groups.
-    * **[Day 18]** Implements a Software Window Watchdog (SW-WWDT) via `app_monitor` to collect Heartbeats and prevent silent deadlocks.
-    * Calls HAL interfaces using `common_status_t`.
-* **Constraint:** Hardware-agnostic. Should run on any MCU if HAL is provided. FreeRTOS API usage is restricted to `.c` files, never in `.h` headers.
+    * Implements a Software Window Watchdog (SW-WWDT) via `app_monitor`.
+    * Implements robust Queue Overrun Handling (`app_sensor`) to prevent dynamic memory fragmentation.
+* **Constraint:** Hardware-agnostic. FreeRTOS API usage is restricted to `.c` files, never in `.h` headers.
 
 ### C. HAL Layer (`src/hal/`)
 * **Role:** Hardware Abstraction.
 * **Key Modules:**
-    * **`hal_gpio`:** Implements minimal ISR routines. Exposes strict `hal_gpio_isr_callback_t` interface to prevent accidental blocking API usage from App layer.
-    * **`hal_i2c`:** Protected by FreeRTOS Mutex (`xSemaphoreCreateMutex`) for SMP thread safety. Implements "9-Clock Recovery" within the locked state.
-    * **`hal_init`:** Wraps SDK specific modules (e.g., `pico_stdio_usb`) to prevent leaky abstractions.
+    * **`hal_gpio`:** Implements minimal ISR routines. Exposes strict `hal_gpio_isr_callback_t`.
+    * **`hal_i2c`:** Protected by FreeRTOS Mutex (`xSemaphoreCreateMutex`). Implements "9-Clock Recovery".
+    * **`hal_init`:** Wraps SDK specific modules to prevent leaky abstractions.
     * **`hal_led`:** Abstracts Pico 2W's CYW43 wireless LED control.
     * **`hal_storage`:** Abstraction for LittleFS on Flash with XIP protection.
-    * **`hal_fault`:** Implements Cortex-M33 HardFault interception via naked assembly. Securely stores Exception Frame (PC, LR) into `.uninitialized_data` (No-Init RAM) and triggers `NVIC_SystemReset()` to avoid Watchdog conflicts.
-    * **`hal_wdt`:** **[Day 18]** Hardware Watchdog abstraction configured for 1500ms timeout.
+    * **`hal_fault`:** Implements Cortex-M33 HardFault interception via naked assembly.
+    * **`hal_wdt`:** Hardware Watchdog abstraction (1500ms timeout).
 
 ---
 
 ## 3. CI/CD Architecture (Dual-Track & Shift-Left Strategy)
 
-*Note: Currently in OS Bring-up transition. CI/CD pipelines are expected to fail until FreeRTOS mocking is implemented.*
+*Note: Infrastructure is fully stabilized. Both Local and Cloud gates are strictly enforced.*
 
 ### A. Local Guardrail (The "Hook")
-* **Trigger:** `git commit` via `.git/hooks/pre-commit` (Implementation delayed to Phase 4).
-* **Strategy:** "Shift-Left Testing". Includes strict compiler checks (`-Werror`).
-* **Current Status:** Temporarily disabled to allow committing OS integration code without triggering false-positive test failures.
+* **Trigger:** `git commit` via `.pre-commit-config.yaml`.
+* **Strategy:** "Shift-Left Testing" preventing bad code from entering Git history.
+* **Pipeline:** 1. 🎨 `clang-format` 2. 🔍 `cppcheck` (MISRA) 3. 🐳 `docker-unit-test`.
 
 ### B. Cloud Factory (GitHub Actions)
 * **Trigger:** `git push` (`.github/workflows/main.yml`)
-* **Actions:** Lint (Cppcheck), Test (CTest), Build (`.uf2`).
-* **Current Status:** Red (Failed) ❌. This is an accepted technical debt while we migrate the test suite to recognize FreeRTOS headers.
+* **Strategy:** "ISO 26262 Reproducible Build" via strict dependency vendoring.
+* **Status:** Green (Passed) ✅.
 
 ---
 
 ## 4. Testing Strategy (Unity Framework)
 
-### A. Mocking Strategy
-* **Level 1: Testing App Logic**
-    * **Goal:** Verify App logic without hardware.
-    * **Method:** Link against `mock_hal_xxx.c`.
-    * **CMake:** Add mock source files to `add_executable`.
+We utilize a **Mirroring Directory Structure** to map `test/` 1:1 with `src/`, ensuring high maintainability.
 
-* **Level 2: Testing HAL Logic (The "Mock SDK" Approach)**
-    * **Goal:** Verify HAL interacts correctly with Pico SDK functions.
-    * **Method:** Use `test/mock/` headers to simulate SDK behavior in Docker (x86).
+### A. Mocking Strategy
+* **Level 1: Component Isolation (Static Library Mocking)**
+    * **Goal:** Prevent "Multiple Definition" Linker errors when mocking HAL/Common components.
+    * **Method:** All mock implementations are compiled into a centralized `libtest_mocks.a` static library. The C linker selectively resolves only undefined symbols from this library.
+* **Level 2: RTOS Time & State Manipulation**
+    * **Goal:** Verify thread-safety, timing logic, and edge cases safely on x86.
+    * **Method:** `mock_freertos.c` intercepts and bypasses native APIs. Features include:
+        * **Time Travel:** Manipulating `xTaskGetTickCount` to test software debounce (`app_button`).
+        * **Queue Simulation:** Forcing `errQUEUE_FULL` to test overrun handling (`app_sensor`).
+        * **Barrier Interception:** Stateful `EventGroup` mock to test synchronous boot behaviors (`app_sync`).
 
 ---
 
 ## 5. Key Directory Structure
 .
 ├── external
-│   ├── FreeRTOS-Kernel    # v11.1.0 SMP Kernel
-│   └── littlefs           
+│   ├── FreeRTOS-Kernel    # v11.1.0 SMP Kernel (Vendored)
+│   └── littlefs           # (Vendored)
 ├── src
-│   ├── CMakeLists.txt     # Top-to-bottom dependency graph (OS -> HAL -> App)
-│   ├── FreeRTOSConfig.h   # Core config: configNUM_CORES=2, configUSE_MUTEXES=1
-│   ├── app
-│   ├── common
-│   ├── hal
-│   └── main.c             # Pure OS scheduler starter
+│   ├── app                # Business Logic
+│   ├── common             # Shared Types/Buffers
+│   ├── hal                # Hardware Abstraction
+│   └── main.c             # System Starter
 └── test
+    ├── CMakeLists.txt     # Test Build Graph (Macros + test_mocks.a)
+    ├── app/               # Mirror of src/app/ (100% Covered)
+    ├── common/            # Mirror of src/common/
+    ├── hal/               # Mirror of src/hal/
+    └── mock/              # Centralized Mocks (mock_freertos.c, etc.)
 
 ---
 
-## 7. Next Steps (Phase 3 & 4 Transition)
+## 7. Next Steps (Phase 5 Transition)
 
-**✅ Tasks Completed (Day 15, 16, 17 - FSM, Sync & Crash Analysis):**
-* ✅ Implemented an $O(1)$ Table-Driven Finite State Machine utilizing a 2D array of Function Pointers.
-* ✅ Decoupled the FSM engine into a dedicated FreeRTOS Task (`vAppFsmTask`) driven by a thread-safe Event Queue.
-* ✅ **[Day 16]** Implemented the `app_sync` module using FreeRTOS Event Groups to create a thread-safe Boot Synchronization Barrier.
-* ✅ **[Day 16]** Eliminated `while(!ready)` polling, reducing CPU load to 0% (Blocked state) during the boot waiting period.
-* ✅ **[Day 16]** Integrated AND Logic (all ready) with OR Logic (any error) to realize a Fast-Fail mechanism.
-* ✅ **[Day 17] HardFault Handler:** Implemented an ARM Cortex-M33 specific HardFault exception handler using inline assembly to evaluate `EXC_RETURN` (MSP vs PSP).
-* ✅ **[Day 17] Post-mortem Dump:** Extracted and dumped CPU Registers (PC, LR) to `.uninitialized_data` (No-Init RAM) for offline crash analysis using `addr2line`.
+**✅ Tasks Completed (Day 18 - App Layer Unit Testing & CI/CD):**
+* ✅ **100% App Layer Test Coverage:** FSM, Sync, Watchdog, Button Debounce, Sensor Queue, Storage, Display.
+* ✅ **Test Architecture Refactoring:** Implemented Mirroring Structure and Static Library Mocking.
+* ✅ **Dual-Layer Watchdog:** Hardware WDT + Software Task Monitor (SW-WWDT).
+* ✅ **Vendoring:** Absorbed FreeRTOS and littlefs for cloud reproducibility.
 
-**✅ Tasks Completed (Day 18 - Watchdog Strategies):**
-* ✅ **Window Watchdog (WWDT):** Implemented hardware watchdog initialization.
-* ✅ **Task Monitor:** Implemented a software watchdog mechanism to monitor RTOS task starvation and deadlocks.
-
-**Tasks (DevOps Tech Debt Resolution):**
-1. Implement Local Git Hooks (`pre-commit`) for automated formatting.
-2. Resolve GitHub Actions CI/CD failure by introducing `mock_freertos.h`.
+**🔜 Tasks Pending (Phase 5 - Diagnostics):**
+1. **[Day 19]** Implement a robust DTC (Diagnostic Trouble Code) generation and logging mechanism in `app_storage` & `app_fsm`.
+2. **[Day 20]** Implement UDS (Unified Diagnostic Services) basic protocol to read/clear DTCs via UART/USB.
 
 ---
 
 ## 8. 🛠 Current Technical Debt
 
-### Resolved (Day 12, 13, 14 Focus)
-* ✅ **[Fixed] ISR to Task Communication:** Removed unsafe `printf` from ISR. Implemented FreeRTOS Direct Task Notification.
-* ✅ **[Fixed] Thread Safety (I2C/SMP):** Implemented Mutex inside `hal_i2c`. Verified thread-safe execution without deadlocks.
-* ✅ **[Fixed] CMake Dependency Graph:** Properly enforced `FreeRTOS-Kernel` linkages, solving `implicit declaration` errors.
-
 ### Resolved (Day 18 Focus)
-* ✅ **[Fixed] System Deadlock Protection:** Implemented a Dual-Layer Watchdog system.
-    * **Hardware Layer:** RP2350 Hardware Watchdog configured for 1500ms timeout.
-    * **Software Layer:** FreeRTOS Task Monitor using EventGroups (`app_monitor`) enforces a Software Window Watchdog (SW-WWDT). Catching task starvation (missing bits) and early-kicking (infinite loops).
-    * **Boot Safety:** Added a 3000ms Boot Grace Period to prevent infinite boot-loops caused by CYW43 high CPU utilization during startup.
-* ✅ **[Fixed] CPU Starvation on Boot:** Removed Day 14 Priority Lab tasks (`PMID_1`, `PMID_2`) that were starving the `vMonitorTask` and triggering Watchdog resets.
+* ✅ **[Fixed] Local Git Guardrails & CI/CD Breakage:** Full DevOps pipeline is now Green.
+* ✅ **[Fixed] ISR to FSM Communication:** `app_fsm_send_event_from_isr()` using `xQueueSendFromISR` has been successfully implemented and unit-tested to support deferred hardware interrupts.
+* ✅ **[Fixed] Linker Conflicts in Testing:** Resolved via `libtest_mocks.a`.
 
-### Pending (Phase 3 & 4 Focus)
-* ⚠️ **[High] Local Git Guardrails:** `.git/hooks/pre-commit` is missing. Code formatting (`clang-format`) is not automatically enforced before commits.
-* ⚠️ **[High] CI/CD & Unit Test Breakage:** x86 Docker unit tests still cannot mock FreeRTOS APIs properly. Need to implement `mock_freertos.h` for GitHub Actions to pass.
-* ⚠️ **[Medium] ISR to FSM Communication:** `app_fsm_send_event()` currently only supports Task-level context via `xQueueSend`. If hardware interrupts (e.g., GPIO EXTI) need to directly trigger FSM state changes in the future, a dedicated `app_fsm_send_event_from_isr()` utilizing `xQueueSendFromISR` must be introduced to avoid RTOS assertion failures.
-* ⚠️ **[Medium] Lab Code in Production:** The `hal_i2c_lab_simulate_long_transfer` API is currently compiled into the HAL layer. Needs to be stripped out via CMake `target_compile_definitions` in Phase 4 before final integration.
+### Pending
+* ⚠️ **[Medium] Lab Code in Production:** The `hal_i2c_lab_simulate_long_transfer` API is currently compiled into the HAL layer. Needs to be stripped out via CMake `target_compile_definitions` before final release.
 * ⚠️ **[Medium] Crash Log Persistence (Day 17/19):** Currently, the `hal_fault` crash report is only stored in No-Init RAM (survives Warm Reset). It needs to be written to LittleFS in `hal_fault_check_and_log_crash()` to survive a Cold Boot.
-* ⚠️ **[Low] FPU Extended Frame Handling (Day 17):** RP2350 has hardware FPU enabled. If a crash occurs while the FPU is in use (`EXC_RETURN` bit 4 is 0), the hardware pushes an extended frame (S0-S15). The current PC offset calculation assumes a standard frame. Needs dynamic offset adjustment for future robustness.
+* ⚠️ **[Low] FPU Extended Frame Handling (Day 17):** RP2350 has hardware FPU enabled. If a crash occurs while the FPU is in use (`EXC_RETURN` bit 4 is 0), the hardware pushes an extended frame (S0-S15). Needs dynamic offset adjustment for future robustness.

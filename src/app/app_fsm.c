@@ -24,6 +24,34 @@ bool app_fsm_send_event(fsm_event_t event)
 
 fsm_state_t app_fsm_get_current_state(void) { return current_state; }
 
+// 【新增】將查表邏輯獨立出來，方便單元測試呼叫
+static void fsm_process_event(fsm_event_t incoming_event)
+{
+    if (incoming_event >= FSM_EVENT_MAX) return;
+
+    fsm_transition_t transition = g_fsm_table[current_state][incoming_event];
+    fsm_state_t next_state = transition.next_state;
+
+    if (next_state != 0 || transition.action != NULL)
+    {
+        if (transition.action != NULL)
+        {
+            transition.action();
+        }
+
+        if (next_state != current_state)
+        {
+            printf("[FSM] State Transited: %d -> %d\n", current_state, next_state);
+            current_state = next_state;
+        }
+    }
+    else
+    {
+        printf("[FSM Warning] Invalid Event %d in State %d. Ignored.\n", incoming_event,
+               current_state);
+    }
+}
+
 void vAppFsmTask(void *pvParameters)
 {
     (void)pvParameters;
@@ -50,46 +78,31 @@ void vAppFsmTask(void *pvParameters)
     // ============================
 
     // 2. O(1) 狀態機超級迴圈
+    // 2. O(1) 狀態機超級迴圈 (修改這裡)
     while (1)
     {
-        // 等待事件到來 (無限期阻塞，釋放 CPU 給其他 Task)
         if (xQueueReceive(xFsmQueue, &incoming_event, pdMS_TO_TICKS(50)) == pdPASS)
         {
-            // 安全防護：檢查 Event 是否越界
-            if (incoming_event >= FSM_EVENT_MAX) continue;
-
-            // === 核心查表邏輯 O(1) ===
-            fsm_transition_t transition = g_fsm_table[current_state][incoming_event];
-            fsm_state_t next_state = transition.next_state;
-
-            // 如果有定義合法的狀態轉移
-            if (next_state != 0 || transition.action != NULL)
-            {
-                // 執行轉移動作
-                if (transition.action != NULL)
-                {
-                    transition.action();
-                }
-
-                // 狀態流轉
-                if (next_state != current_state)
-                {
-                    printf("[FSM] State Transited: %d -> %d\n", current_state, next_state);
-                    current_state = next_state;
-                }
-            }
-            else
-            {
-                // 無效事件攔截
-                printf("[FSM Warning] Invalid Event %d in State %d. Ignored.\n", incoming_event,
-                       current_state);
-            }
+            // 【修改】直接呼叫剛剛抽離出來的函數
+            fsm_process_event(incoming_event);
         }
         else
         {
-            // Timeout 了，代表 50ms 內沒事件發生，系統閒置中。
-            // 我們依然要舉起心跳，告訴 WDT "我是閒著，不是當機"
             app_monitor_report_heartbeat(HEARTBEAT_BIT_FSM);
         }
     }
+}
+
+bool app_fsm_send_event_from_isr(fsm_event_t event)
+{
+    if (xFsmQueue == NULL)
+    {
+        return false;
+    }
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    BaseType_t res = xQueueSendFromISR(xFsmQueue, &event, &xHigherPriorityTaskWoken);
+
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+
+    return (res == pdTRUE);
 }

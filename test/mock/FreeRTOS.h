@@ -19,8 +19,11 @@ typedef uint32_t EventBits_t;
 #define pdFALSE 0
 #define portMAX_DELAY 0xFFFFFFFF
 #define pdMS_TO_TICKS(x) (x)
+#define pdTICKS_TO_MS(x) (x)
 #define portGET_CORE_ID() 0
 #define configASSERT(x)
+// 【新增巨集】騙過中斷 Context Switch 的呼叫
+#define portYIELD_FROM_ISR(x) (void)(x)
 
 typedef struct
 {

@@ -61,4 +61,6 @@ bool app_fsm_send_event(fsm_event_t event);
  */
 fsm_state_t app_fsm_get_current_state(void);
 
+// 【新增】ISR 級別發送 (專供硬體中斷使用)
+bool app_fsm_send_event_from_isr(fsm_event_t event);
 #endif /* APP_FSM_H */
