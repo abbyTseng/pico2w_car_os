@@ -6,7 +6,6 @@ add_library(app STATIC
     app_storage.c
     app_button.c
     app_sensor.c
-    app_priority_lab.c
     app_fsm.c 
     app_fsm_table.c
     app_sync.c
