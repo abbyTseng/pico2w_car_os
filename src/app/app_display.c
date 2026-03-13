@@ -123,26 +123,29 @@ void app_display_test_once(void) { app_display_show_day10(); }
 void vAppDisplayTask(void *pvParameters)
 {
     (void)pvParameters;
+    bool is_hardware_ok = true;  // 硬體健康標記
 
     printf("[App Display] Initializing OLED...\n");
-    // 這裡的 init 底層會呼叫 hal_i2c_init，進而建立 Mutex
     if (!app_display_init())
     {
-        printf("[App Display] OLED Init Failed. Suspending Task.\n");
-        vTaskSuspend(NULL);  // 初始化失敗就掛起自己，不要空轉浪費 CPU
+        // 進入降級模式：不掛起任務，繼續活著餵狗！
+        printf("[App Display] OLED Init Failed. Entering DEGRADED MODE.\n");
+        is_hardware_ok = false;
     }
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(100);  // 100ms 週期 (10Hz 高頻刷新)
+    const TickType_t xFrequency = pdMS_TO_TICKS(100);
 
     while (1)
     {
-        app_monitor_report_heartbeat(HEARTBEAT_BIT_DISPLAY);  // <--- [新增] 每一輪報平安
-        // 這裡會呼叫 hal_i2c_write，底層會自動 Take/Give Mutex！
-        app_display_show_day10();
+        // 1. 無論硬體好壞，都要報平安！
+        app_monitor_report_heartbeat(HEARTBEAT_BIT_DISPLAY);
 
-        // 註解掉 printf 避免洗畫面，但實作上它確實在跑
-        // printf("[Task Display] Refreshed on Core: %d\n", portGET_CORE_ID());
+        // 2. 只有在硬體健康時，才去操作 I2C
+        if (is_hardware_ok)
+        {
+            app_display_show_day10();
+        }
 
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }

@@ -121,18 +121,27 @@ hal_i2c_status_t hal_i2c_write_timeout(uint8_t addr, const uint8_t *src, size_t 
     }
 
     // 2. 執行實體 I2C 寫入
+    // 2. 執行實體 I2C 寫入
     int result = i2c_write_timeout_us(I2C_INST, addr, src, len, false, timeout_us);
 
     hal_i2c_status_t final_status = HAL_I2C_OK;
+    extern void app_diag_report_event(uint16_t dtc_id, bool failed);
 
     if (result == PICO_ERROR_TIMEOUT)
     {
-        hal_i2c_bus_recovery();  // 恢復程序依然在 Mutex 的保護範圍內執行！
+        hal_i2c_bus_recovery();               // 恢復程序
+        app_diag_report_event(0xC155, true);  // 0xC155 = DTC_I2C_BUS_ERROR
         final_status = HAL_I2C_TIMEOUT;
     }
     else if (result < 0)
     {
+        app_diag_report_event(0xC155, true);
         final_status = HAL_I2C_ERROR;
+    }
+    else
+    {
+        // 成功！報告 Healed (取消當前錯誤狀態)
+        app_diag_report_event(0xC155, false);
     }
 
     // 3. 釋放 Mutex (統一出口，確保絕對不會發生 Deadlock)

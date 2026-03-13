@@ -103,11 +103,16 @@ We utilize a **Mirroring Directory Structure** to map `test/` 1:1 with `src/`, e
 * ✅ **Test Architecture Refactoring:** Implemented Mirroring Structure and Static Library Mocking.
 * ✅ **Dual-Layer Watchdog:** Hardware WDT + Software Task Monitor (SW-WWDT).
 * ✅ **Vendoring:** Absorbed FreeRTOS and littlefs for cloud reproducibility.
+**✅ Tasks Completed (Day 19 - DTC & Fault Management):**
+* ✅ **UDS DTC Architecture:** Implemented `app_diag` to manage fault codes (SAE J2012) with Pending/Confirmed status bits.
+* ✅ **Deferred Flash Persistence:** Implemented a 30-second delayed write-back mechanism using LittleFS to protect Flash wear out.
+* ✅ **Fail-Operational Design (Degraded Mode):** Refactored `app_display` to handle I2C hardware disconnections gracefully without triggering Watchdog starvation.
+* ✅ **HAL Decoupling:** Prevented dependency injection from App to HAL using `extern` hooks for diagnostic reporting.
+* ✅ **Host Unit Testing:** 100% covered `test_app_diag` and updated `test_app_monitor` heartbeat masks.
 
 **🔜 Tasks Pending (Phase 5 - Diagnostics):**
-1. **[Day 19]** Implement a robust DTC (Diagnostic Trouble Code) generation and logging mechanism in `app_storage` & `app_fsm`.
-2. **[Day 20]** Implement UDS (Unified Diagnostic Services) basic protocol to read/clear DTCs via UART/USB.
-
+1. **[Day 20]** Implement UDS (Unified Diagnostic Services) basic protocol to read/clear DTCs via UART/USB.
+2. **[Day 21]** Implement UDS $14 ClearDiagnosticInformation.
 ---
 
 ## 8. 🛠 Current Technical Debt
@@ -121,3 +126,5 @@ We utilize a **Mirroring Directory Structure** to map `test/` 1:1 with `src/`, e
 * ⚠️ **[Medium] Lab Code in Production:** The `hal_i2c_lab_simulate_long_transfer` API is currently compiled into the HAL layer. Needs to be stripped out via CMake `target_compile_definitions` before final release.
 * ⚠️ **[Medium] Crash Log Persistence (Day 17/19):** Currently, the `hal_fault` crash report is only stored in No-Init RAM (survives Warm Reset). It needs to be written to LittleFS in `hal_fault_check_and_log_crash()` to survive a Cold Boot.
 * ⚠️ **[Low] FPU Extended Frame Handling (Day 17):** RP2350 has hardware FPU enabled. If a crash occurs while the FPU is in use (`EXC_RETURN` bit 4 is 0), the hardware pushes an extended frame (S0-S15). Needs dynamic offset adjustment for future robustness.
+* ⚠️ **[Medium] DTC Debounce Logic (Day 19):** Currently modified to "1-Trip Fault" (`occurrence_count >= 1`) for testing. Needs a proper maturity calibration (e.g., 5 cycles) for production.
+* ⚠️ **[Medium] DTC FIFO Overwrite (Day 19):** `g_dtc_db` is currently a fixed array of 10. Needs a Ring-buffer logic to overwrite the oldest Non-Confirmed DTCs when the database is full (TM-02).

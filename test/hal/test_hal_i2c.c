@@ -5,8 +5,21 @@
 #include "mock/hardware/i2c.h"
 #include "mock/pico/stdlib.h"
 
+// --- 新增：攔截診斷事件的 Spy 變數 ---
+static int s_diag_report_call_count = 0;
+static uint16_t s_last_dtc_id = 0;
+static bool s_last_dtc_failed = false;
+
+// 攔截 hal_i2c.c 裡面的 app_diag_report_event 呼叫
+// (連結器會優先使用這裡的實作，而不會去抓 test_mocks 裡的空函數)
+void app_diag_report_event(uint16_t dtc_id, bool failed)
+{
+    s_diag_report_call_count++;
+    s_last_dtc_id = dtc_id;
+    s_last_dtc_failed = failed;
+}
+
 // 2. 白箱引入：直接把被測程式碼包進來
-// 注意：這會讓編譯器編譯 hal_i2c.c，並使用上面定義的 Mock Header
 #include "../src/hal/hal_i2c.c"
 
 // --- Mock 狀態變數 ---
@@ -57,12 +70,17 @@ void setUp(void)
     s_gpio_func_call_count = 0;
     s_gpio_put_call_count = 0;
     s_i2c_write_return_value = 0;
+
+    // 重置診斷 Spy 變數
+    s_diag_report_call_count = 0;
+    s_last_dtc_id = 0;
+    s_last_dtc_failed = false;
 }
 void tearDown(void) {}
 
 // --- 測試案例 ---
 
-// 測試 1: 正常寫入，不應觸發 Recovery
+// 測試 1: 正常寫入，不應觸發 Recovery，且應報告診斷 Healed (Pass)
 void test_write_success_should_not_recover(void)
 {
     s_i2c_write_return_value = 1;  // 模擬成功 (回傳 > 0)
@@ -71,10 +89,15 @@ void test_write_success_should_not_recover(void)
 
     TEST_ASSERT_EQUAL(HAL_I2C_OK, status);
     TEST_ASSERT_EQUAL(0, s_gpio_put_call_count);  // 沒發生 Toggle
+
+    // 【新增】驗證診斷回報：成功時應回報 failed = false
+    TEST_ASSERT_EQUAL(1, s_diag_report_call_count);
+    TEST_ASSERT_EQUAL_HEX16(0xC155, s_last_dtc_id);
+    TEST_ASSERT_FALSE(s_last_dtc_failed);
 }
 
-// 測試 2: 寫入 Timeout，應觸發 9 Clocks Recovery
-void test_write_timeout_should_trigger_recovery(void)
+// 測試 2: 寫入 Timeout，應觸發 9 Clocks Recovery，且應報告診斷 Failed
+void test_write_timeout_should_trigger_recovery_and_report_dtc(void)
 {
     s_i2c_write_return_value = PICO_ERROR_TIMEOUT;  // 模擬 Timeout
 
@@ -86,15 +109,18 @@ void test_write_timeout_should_trigger_recovery(void)
     TEST_ASSERT_TRUE(s_gpio_func_call_count >= 2);
 
     // 驗證 SCL 是否有 Toggle (Bit-Banging)
-    // 9 個 Clocks * 2 (High/Low) + STOP bit...
-    // 因為我們模擬 SDA 永遠 Stuck，所以它會跑滿迴圈
     TEST_ASSERT_TRUE(s_gpio_put_call_count >= 18);
+
+    // 【新增】驗證診斷回報：Timeout 時應回報 failed = true
+    TEST_ASSERT_EQUAL(1, s_diag_report_call_count);
+    TEST_ASSERT_EQUAL_HEX16(0xC155, s_last_dtc_id);
+    TEST_ASSERT_TRUE(s_last_dtc_failed);
 }
 
 int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_write_success_should_not_recover);
-    RUN_TEST(test_write_timeout_should_trigger_recovery);
+    RUN_TEST(test_write_timeout_should_trigger_recovery_and_report_dtc);
     return UNITY_END();
 }

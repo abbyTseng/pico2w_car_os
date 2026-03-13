@@ -24,6 +24,7 @@ add_library(test_mocks STATIC
     mock/mock_hal_storage.c
     mock/mock_hal_wdt.c
     mock/mock_hal_i2c.c
+    mock/mock_app_diag.c
 )
 target_include_directories(test_mocks PUBLIC 
     ${ROOT_DIR}/src 
@@ -75,3 +76,4 @@ add_unity_test(test_app_sync app/test_app_sync.c "")
 add_unity_test(test_app_display app/test_app_display.c "")
 add_unity_test(test_app_button app/test_app_button.c "")
 add_unity_test(test_app_sensor app/test_app_sensor.c "")
+add_unity_test(test_app_diag app/test_app_diag.c "")

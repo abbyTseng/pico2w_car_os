@@ -10,6 +10,7 @@ add_library(app STATIC
     app_fsm_table.c
     app_sync.c
     app_monitor.c
+    app_diag.c
 )
 
 target_include_directories(app PUBLIC
